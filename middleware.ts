@@ -3,9 +3,17 @@ import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req });
+  
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return res;
+  }
+
   const sb = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll: () => req.cookies.getAll(),
@@ -17,6 +25,7 @@ export async function middleware(req: NextRequest) {
       }
     }
   );
+
   const { data: { user } } = await sb.auth.getUser();
   const path = req.nextUrl.pathname;
   const isLogin = path === "/login";
@@ -30,12 +39,14 @@ export async function middleware(req: NextRequest) {
     u.searchParams.set("next", path);
     return NextResponse.redirect(u);
   }
+
   if (user && isLogin) {
     const u = req.nextUrl.clone();
     u.pathname = "/";
     u.search = "";
     return NextResponse.redirect(u);
   }
+
   return res;
 }
 
