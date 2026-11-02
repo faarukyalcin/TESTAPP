@@ -1,0 +1,23 @@
+import { NextResponse } from "next/server";
+import { apiAdminContext } from "@/lib/auth";
+import { askAI } from "@/lib/ai";
+
+/** Performs a real, minimal provider request without exposing the API credential. */
+export async function POST() {
+  const c = await apiAdminContext();
+  if (!c) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const started = Date.now();
+    const reply = await askAI(
+      "You are a connectivity test. Reply with exactly: DeutschAI bağlantısı başarılı.",
+      "Bağlantıyı test et."
+    );
+    if (!reply.trim()) throw new Error("AI sağlayıcısı boş yanıt döndürdü.");
+    return NextResponse.json({ ok: true, latencyMs: Date.now() - started, reply: reply.trim().slice(0, 160) });
+  } catch (error) {
+    console.error("AI provider test failed", error);
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : "AI bağlantısı kurulamadı."
+    }, { status: 502 });
+  }
+}
