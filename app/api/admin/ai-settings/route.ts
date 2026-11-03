@@ -13,6 +13,8 @@ const schema = z.object({
 export async function GET() {
   const c = await apiAdminContext();
   if (!c) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "Vercel ortam değişkenlerinde SUPABASE_SERVICE_ROLE_KEY eksik." }, { status: 503 });
+
   const a = supabaseAdmin();
   const { data } = await a.from("platform_ai_settings").select("provider,model,api_key_ciphertext,updated_at").eq("id", "default").maybeSingle();
   const provider = data?.provider || (process.env.AI_PROVIDER === "openai" ? "openai" : "gemini");
