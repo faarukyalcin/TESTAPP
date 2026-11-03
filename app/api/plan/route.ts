@@ -28,7 +28,7 @@ export async function POST() {
       wordsLearned: (vocab.data || []).filter((v: any) => v.learned).length, hardWords: (vocab.data || []).filter((v: any) => v.lapses >= 2).length,
       lessonsDone: (lessons.data || []).length
     };
-    const raw = await askAI("You are a German and Goethe exam planner for Turkish A1/A2 learners. Using ONLY the real data given, return JSON: {weekly_focus,summary,daily_words,days:[{day,focus,minutes}],review_topics,goethe:{exam_level,weeks:[{week,focus,skills,practice}]}}. Include exactly 7 daily entries, use target level A1/A2, and make a realistic 12-week roadmap that rotates Goethe Hören, Lesen, Schreiben, Sprechen, mock exams and review. Prioritise measured weaknesses. Explain in Turkish.", JSON.stringify(data), true);
+    const raw = await askAI("You are a German and Goethe exam planner for Turkish A1/A2 learners. Using ONLY the real data given, return JSON: {weekly_focus,summary,daily_words,days:[{day,focus,minutes}],review_topics,goethe:{exam_level,weeks:[{week,focus,skills,practice}]}}. Include exactly 7 daily entries, use target level A1/A2, and make a realistic 12-week roadmap that rotates Goethe Hören, Lesen, Schreiben, Sprechen, mock exams and review. Prioritise measured weaknesses. Explain in Turkish.", JSON.stringify(data), true, c.user.id, c.sb);
     const plan = planSchema.parse(parseAIJson(raw));
     await a.from("learning_plans").update({ active: false }).eq("user_id", c.user.id);
     await a.from("learning_plans").insert({ user_id: c.user.id, plan });
@@ -38,3 +38,4 @@ export async function POST() {
     return NextResponse.json({ error: "Plan oluşturulamadı." }, { status: 502 });
   }
 }
+
