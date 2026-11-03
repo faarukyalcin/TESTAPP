@@ -43,15 +43,17 @@ export async function askAI(system:string,prompt:string,json=false,userId?:strin
     if(!response.ok){const d=await response.json().catch(()=>null);throw Error(`OpenAI ${response.status}: ${d?.error?.message||"İstek reddedildi."}`);}
     const d=await response.json(); return d.choices[0].message.content as string;
   }
-  response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":config.apiKey},signal:AbortSignal.timeout(60000),body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{temperature:.35,maxOutputTokens:4096,...(json?{responseMimeType:"application/json"}:{})}})});
+  const generationConfig:any={temperature:.35,maxOutputTokens:4096,...(json?{responseMimeType:"application/json"}:{})};
+  // Gemini 3/4 defaults to medium reasoning. Low is faster for tutoring and plan generation.
+  if (/^gemini-(3|4)/.test(config.model)) generationConfig.thinkingConfig={thinkingLevel:"low"};
+  response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":config.apiKey},signal:AbortSignal.timeout(60000),body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig})});
   if(!response.ok){const d=await response.json().catch(()=>null);throw Error(`Gemini ${response.status}: ${d?.error?.message||"İstek reddedildi."}`);}
   const d=await response.json(); return (d.candidates?.[0]?.content?.parts||[]).map((p:{text?:string})=>p.text||"").join("");
 }
-export function parseAIJson(raw:string){return JSON.parse(raw.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g,"").trim());}
+export function parseAIJson(raw:string){return JSON.parse(raw.replace(/^\\s*\\`\\`\\`(?:json)?\\s*|\\s*\\`\\`\\`\\s*$/g,"").trim());}
 const goethePlan=z.object({exam_level:z.enum(["A1","A2"]).default("A2"),weeks:z.array(z.object({week:z.number().int().min(1).max(52),focus:z.string().max(200),skills:z.array(z.string().max(40)).max(4),practice:z.string().max(300)})).max(52).default([])});
 const planShape=z.object({weekly_focus:z.string().max(300),summary:z.string().max(1500),daily_words:z.number().int().min(0).max(30).default(10),days:z.array(z.object({day:z.string().max(40),focus:z.string().max(300),minutes:z.number().min(0).max(240)})).max(7).default([]),review_topics:z.array(z.string().max(120)).max(8).default([]),goethe:goethePlan.default({exam_level:"A2",weeks:[]})});
 export const planSchema=planShape;
 export const assessmentAISchema=z.object({summary:z.string().max(2000),writing_score:z.number().int().min(0).max(100).nullable().default(null),strengths:z.array(z.string().max(300)).max(8).default([]),weaknesses:z.array(z.string().max(300)).max(8).default([]),plan:planShape});
 const sc=z.number().int().min(0).max(100);
 export const writingResultSchema=z.object({level:z.enum(["A1","A2"]),corrected:z.string().max(6000),errors:z.array(z.object({original:z.string().max(300),fix:z.string().max(300),reason:z.string().max(400)})).max(15).default([]),scores:z.object({grammar:sc,vocabulary:sc,structure:sc,spelling:sc,coherence:sc,task:sc}),alternatives:z.array(z.string().max(300)).max(5).default([]),feedback:z.string().max(1500)});
-
