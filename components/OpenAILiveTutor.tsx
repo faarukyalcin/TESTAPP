@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { extractDailyMinutesUpdate } from "@/lib/assistant-intent";
+import { isPlanRegenerationRequest } from "@/lib/plan-intent";
 
 type Entry = { role: "user" | "assistant"; content: string };
 type RealtimeEvent = { type?: string; delta?: string; transcript?: string; error?: { message?: string } };
@@ -41,6 +43,8 @@ export default function OpenAILiveTutor({ level }: { level: "A1" | "A2" }) {
   const aiDraftRef = useRef("");
   const startedRef = useRef(0);
   const activeRef = useRef(false);
+  const commandBusyRef = useRef(false);
+  const responseActiveRef = useRef(false);
 
   function addEntry(entry: Entry) {
     historyRef.current = [...historyRef.current, entry].slice(-60);
@@ -87,10 +91,13 @@ export default function OpenAILiveTutor({ level }: { level: "A1" | "A2" }) {
   }
 
   function handleEvent(event: RealtimeEvent) {
-    if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
+    if (event.type === "response.created") {
+      responseActiveRef.current = true;
+    } else if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
       userDraftRef.current = event.transcript;
       setDraftUser(event.transcript);
-      setStatus("Öğretmen yanıtlıyor…");
+      if (extractDailyMinutesUpdate(event.transcript) != null || isPlanRegenerationRequest(event.transcript)) void runSystemCommand(event.transcript);
+      else setStatus("Öğretmen yanıtlıyor…");
     } else if (event.type === "response.output_audio_transcript.delta" || event.type === "response.output_text.delta") {
       aiDraftRef.current += event.delta || "";
       setDraftAI(aiDraftRef.current);
@@ -100,12 +107,41 @@ export default function OpenAILiveTutor({ level }: { level: "A1" | "A2" }) {
       else if (event.type === "response.output_text.done" && event.transcript) aiDraftRef.current = event.transcript;
       setDraftAI(aiDraftRef.current);
     } else if (event.type === "response.done") {
+      responseActiveRef.current = false;
       commitDrafts();
       setStatus("Dinliyorum… konuşabilirsin");
     } else if (event.type === "error") {
       setError(event.error?.message || "ChatGPT Live bağlantı hatası.");
       setStatus("Bağlantı hatası");
     }
+  }
+
+  async function runSystemCommand(message: string) {
+    if (commandBusyRef.current) return;
+    commandBusyRef.current = true;
+    commitDrafts();
+    setStatus("İlerlemen analiz ediliyor, program güncelleniyor…");
+    const channel = channelRef.current;
+    try {
+      if (channel?.readyState === "open" && responseActiveRef.current) channel.send(JSON.stringify({ type: "response.cancel" }));
+      const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Program güncellenemedi.");
+      if (channel?.readyState === "open") {
+        channel.send(JSON.stringify({ type: "response.create", response: { instructions: "The learning system completed this requested action: " + data.reply + " Tell the learner briefly in Turkish what changed, then ask what they want to practice next." } }));
+        setStatus("Program güncellendi; öğretmen sonucu sesli anlatıyor…");
+      } else {
+        aiDraftRef.current = data.reply;
+        setDraftAI(data.reply);
+        commitDrafts();
+        setStatus("Program güncellendi.");
+      }
+    } catch (cause) {
+      const messageText = cause instanceof Error ? cause.message : "Program güncellenemedi.";
+      setError(messageText);
+      if (channel?.readyState === "open") channel.send(JSON.stringify({ type: "response.create", response: { instructions: "The requested learning-system action failed: " + messageText + " Explain briefly in Turkish that the current plan was preserved." } }));
+      setStatus("Program korunuyor");
+    } finally { commandBusyRef.current = false; }
   }
 
   async function start() {
@@ -175,6 +211,11 @@ export default function OpenAILiveTutor({ level }: { level: "A1" | "A2" }) {
     if (!text || !channel || channel.readyState !== "open") return;
     commitDrafts();
     addEntry({ role: "user", content: text });
+    if (extractDailyMinutesUpdate(text) != null || isPlanRegenerationRequest(text)) {
+      setTyped("");
+      void runSystemCommand(text);
+      return;
+    }
     channel.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     channel.send(JSON.stringify({ type: "response.create" }));
     setTyped("");

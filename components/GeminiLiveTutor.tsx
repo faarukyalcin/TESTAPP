@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { extractDailyMinutesUpdate } from "@/lib/assistant-intent";
+import { isPlanRegenerationRequest } from "@/lib/plan-intent";
 
 type Entry = { role: "user" | "assistant"; content: string };
 type LiveMessage = {
@@ -79,6 +81,7 @@ export default function GeminiLiveTutor({ level }: { level: "A1" | "A2" }) {
   const nextPlayRef = useRef(0);
   const soundsRef = useRef(new Set<AudioBufferSourceNode>());
   const startedRef = useRef(0);
+  const commandBusyRef = useRef(false);
 
   function addEntry(entry: Entry) {
     const next = [...historyRef.current, entry].slice(-60);
@@ -94,6 +97,31 @@ export default function GeminiLiveTutor({ level }: { level: "A1" | "A2" }) {
     outputDraftRef.current = "";
     setDraftUser("");
     setDraftAI("");
+  }
+
+  async function runSystemCommand(message: string) {
+    if (commandBusyRef.current || (extractDailyMinutesUpdate(message) == null && !isPlanRegenerationRequest(message))) return;
+    commandBusyRef.current = true;
+    setStatus("İlerlemen analiz ediliyor, program güncelleniyor…");
+    try {
+      const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Program güncellenemedi.");
+      const socket = socketRef.current;
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ realtimeInput: { text: "The learning system has completed this requested action: " + data.reply + " Tell the learner briefly in Turkish what was changed, then ask what they want to practice next." } }));
+        setStatus("Program güncellendi; öğretmen sonucu sesli anlatıyor…");
+      } else {
+        addEntry({ role: "assistant", content: data.reply });
+        setStatus("Program güncellendi.");
+      }
+    } catch (cause) {
+      const messageText = cause instanceof Error ? cause.message : "Program güncellenemedi.";
+      setError(messageText);
+      const socket = socketRef.current;
+      if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ realtimeInput: { text: "The requested learning-system action could not be completed: " + messageText + " Explain briefly in Turkish and keep the current plan unchanged." } }));
+      setStatus("Program korunuyor");
+    } finally { commandBusyRef.current = false; }
   }
   function clearAudio() {
     for (const sound of soundsRef.current) {
@@ -228,8 +256,10 @@ export default function GeminiLiveTutor({ level }: { level: "A1" | "A2" }) {
           }
         }
         if (content.turnComplete) {
+          const studentText = inputDraftRef.current.trim();
           commitDrafts();
-          setStatus("Dinliyorum…");
+          if (studentText && (extractDailyMinutesUpdate(studentText) != null || isPlanRegenerationRequest(studentText))) void runSystemCommand(studentText);
+          else setStatus("Dinliyorum…");
         }
       };
 
@@ -275,6 +305,11 @@ export default function GeminiLiveTutor({ level }: { level: "A1" | "A2" }) {
     if (!message || !socket || socket.readyState !== WebSocket.OPEN) return;
     commitDrafts();
     addEntry({ role: "user", content: message });
+    if (extractDailyMinutesUpdate(message) != null || isPlanRegenerationRequest(message)) {
+      setTyped("");
+      void runSystemCommand(message);
+      return;
+    }
     socket.send(JSON.stringify({ realtimeInput: { text: message } }));
     setTyped("");
     setStatus("Öğretmen yanıtlıyor…");

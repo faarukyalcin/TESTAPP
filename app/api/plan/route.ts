@@ -7,8 +7,8 @@ export async function POST() {
   const c = await apiContext();
   if (!c) return NextResponse.json({ error: "Giriş yapman gerekiyor." }, { status: 401 });
   try {
-    const plan = await buildAndActivateLearningPlan(c.user.id, c.profile, c.sb);
-    return NextResponse.json({ plan, integrated: true });
+    const result = await buildAndActivateLearningPlan(c.user.id, c.profile, c.sb);
+    return NextResponse.json({ ...result, integrated: true });
   } catch (error) {
     if (error instanceof LearningPlanError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Learning plan update failed", error);

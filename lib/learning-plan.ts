@@ -7,7 +7,7 @@ export class LearningPlanError extends Error {
   constructor(message: string, readonly status = 502) { super(message); }
 }
 
-export async function buildAndActivateLearningPlan(userId: string, profile: Profile, sb: any) {
+export async function buildAndActivateLearningPlan(userId: string, profile: Profile, sb: any, options: { dailyMinutesOverride?: number } = {}) {
   if (!(await aiAllowed(userId, "plan", 5))) throw new LearningPlanError("Plan yenileme sınırına ulaştın. Biraz sonra tekrar dene.", 429);
 
   const admin = supabaseAdmin();
@@ -30,9 +30,10 @@ export async function buildAndActivateLearningPlan(userId: string, profile: Prof
     if (attempt.correct) practiceAccuracy[skill].correct++;
   }
 
+  const dailyMinutes = options.dailyMinutesOverride ?? profile.daily_minutes;
   const data = {
     level: profile.cefr_level || "A1", target: profile.target_level,
-    goal: profile.admin_goal || profile.learning_goal || "Almanca öğrenmek", dailyMinutes: profile.daily_minutes,
+    goal: profile.admin_goal || profile.learning_goal || "Almanca öğrenmek", dailyMinutes,
     placement: assessment.data?.input?.scores || null, weaknesses: assessment.data?.weaknesses || [],
     practiceAccuracy, recentExams: exams.data || [],
     wordsLearned: (vocabulary.data || []).filter((word: any) => word.learned).length,
@@ -56,10 +57,22 @@ export async function buildAndActivateLearningPlan(userId: string, profile: Prof
     throw new LearningPlanError("Yeni program hazırlanamadı. Mevcut programın korunuyor; biraz sonra tekrar dene.");
   }
 
+  if (options.dailyMinutesOverride != null) {
+    const { error } = await sb.from("profiles").update({ daily_minutes: options.dailyMinutesOverride }).eq("id", userId);
+    if (error) {
+      console.error("Daily study goal update failed", error);
+      throw new LearningPlanError("Yeni program hazırlandı ama günlük hedef kaydedilemedi. Eski hedef ve program korunuyor.", 500);
+    }
+  }
+
   const { data: created, error: insertError } = await admin.from("learning_plans")
     .insert({ user_id: userId, plan, active: true }).select("id").single();
   if (insertError || !created?.id) {
     console.error("Learning plan save failed", insertError);
+    if (options.dailyMinutesOverride != null) {
+      const { error: rollbackError } = await sb.from("profiles").update({ daily_minutes: profile.daily_minutes }).eq("id", userId);
+      if (rollbackError) console.error("Daily study goal rollback failed", rollbackError);
+    }
     throw new LearningPlanError("Yeni program sisteme kaydedilemedi. Mevcut programın korunuyor.");
   }
 
@@ -67,5 +80,5 @@ export async function buildAndActivateLearningPlan(userId: string, profile: Prof
     .update({ active: false }).eq("user_id", userId).neq("id", created.id);
   if (deactivateError) console.error("Previous plans could not be deactivated", deactivateError);
 
-  return plan;
+  return { plan, dailyMinutes };
 }

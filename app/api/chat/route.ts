@@ -4,6 +4,7 @@ import { askAI, chatSchema } from "@/lib/ai";
 import { aiAllowed } from "@/lib/limit";
 import { buildAndActivateLearningPlan, LearningPlanError } from "@/lib/learning-plan";
 import { isPlanRegenerationRequest } from "@/lib/plan-intent";
+import { extractDailyMinutesUpdate } from "@/lib/assistant-intent";
 
 export async function POST(req: Request) {
   const c = await apiContext();
@@ -11,16 +12,23 @@ export async function POST(req: Request) {
   const p = chatSchema.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: "Geçersiz mesaj" }, { status: 400 });
 
-  if (isPlanRegenerationRequest(p.data.message)) {
+  const requestedDailyMinutes = extractDailyMinutesUpdate(p.data.message);
+  if (requestedDailyMinutes != null && (requestedDailyMinutes < 5 || requestedDailyMinutes > 240)) {
+    return NextResponse.json({ error: "Günlük çalışma hedefi 5 ile 240 dakika arasında olmalı." }, { status: 400 });
+  }
+
+  if (requestedDailyMinutes != null || isPlanRegenerationRequest(p.data.message)) {
     try {
-      const plan = await buildAndActivateLearningPlan(c.user.id, c.profile, c.sb);
-      const reply = `Programını ilerlemene göre yeniden hazırladım ve sistemdeki aktif programına ekledim. Bu haftaki odağın: ${plan.weekly_focus}. Ana sayfandaki bugünkü çalışma adımı da yeni programa göre güncellendi.`;
+      const result = await buildAndActivateLearningPlan(c.user.id, c.profile, c.sb, { dailyMinutesOverride: requestedDailyMinutes ?? undefined });
+      const changedGoal = requestedDailyMinutes != null && requestedDailyMinutes !== c.profile.daily_minutes;
+      const goalText = changedGoal ? ` Günlük çalışma hedefini ${c.profile.daily_minutes} dakikadan ${result.dailyMinutes} dakikaya ayarladım.` : "";
+      const reply = `Programını ilerleme verilerine göre yeniden hazırladım ve aktif programa ekledim.${goalText} Bu haftaki odağın: ${result.plan.weekly_focus}. Ana sayfandaki bugünkü çalışma adımı da yeni programa göre güncellendi.`;
       const { error } = await c.sb.from("chat_messages").insert([
         { user_id: c.user.id, role: "user", content: p.data.message },
         { user_id: c.user.id, role: "assistant", content: reply }
       ]);
       if (error) console.error("plan command chat save failed", error);
-      return NextResponse.json({ reply, plan, planUpdated: true });
+      return NextResponse.json({ reply, plan: result.plan, dailyMinutes: result.dailyMinutes, planUpdated: true });
     } catch (error) {
       if (error instanceof LearningPlanError) return NextResponse.json({ error: error.message }, { status: error.status });
       console.error("Chat plan regeneration failed", error);
