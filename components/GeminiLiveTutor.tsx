@@ -135,7 +135,7 @@ export default function GeminiLiveTutor({ level }: { level: "A1" | "A2" }) {
           scenario: "live-" + scenario,
           seconds,
           avg_confidence: null,
-          transcript: historyRef.current
+          transcript: historyRef.current.map(entry => ({ ...entry, content: entry.content.slice(0, 500) }))
         })
       }).catch(() => null);
       if (!response?.ok) setError("Konuşma bitti ancak oturum kaydedilemedi.");
