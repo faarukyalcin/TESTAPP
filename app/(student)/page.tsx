@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { dayKey, streakFromDates, SKILL_LABEL, pct } from "@/lib/scoring";
+import PlanButton from "@/components/PlanButton";
 
 export default async function Home() {
   const { sb, user, profile } = await requireStudent();
@@ -30,29 +31,65 @@ export default async function Home() {
   const days = (plan.data?.plan?.days || []) as { day: string; focus: string; minutes: number }[];
   const todayPlan = days[dow];
   const goethe = (plan.data?.plan as any)?.goethe;
-  return <main className="wrap">
-    <h1>Guten Tag{profile.display_name ? `, ${profile.display_name}` : ""} 👋</h1>
-    <p className="muted">Seviye: <b>{profile.cefr_level || "–"}</b> · Hedef: {profile.target_level} · XP: {profile.xp}</p>
-    {profile.admin_goal && <section className="panel"><b>Öğretmeninin hedefi:</b> {profile.admin_goal}</section>}
-    {(task.data || []).length > 0 && <section className="panel"><b>Yeni görev</b>{(task.data || []).map((t: any, i: number) => <p key={i}>• {t.title}{t.body ? ` — ${t.body}` : ""}</p>)}<Link href="/notifications">Bildirimlere git →</Link></section>}
-    <div className="grid">
-      <section className="panel"><p className="muted">BUGÜN</p><p className="stat">{todayMin} / {profile.daily_minutes} dk</p><div className="bar"><i style={{ width: `${goalPct}%` }} /></div><p className="muted">Günlük hedef %{goalPct}</p></section>
-      <section className="panel"><p className="muted">ÇALIŞMA SERİSİ</p><p className="stat">{streak} gün 🔥</p><p className="muted">Hafta: {weekMin} dk · Toplam: {totalMin} dk</p></section>
-      <section className="panel"><p className="muted">KELİMELER</p><p className="stat">{learned} / {vocabTotal.count ?? 0}</p><p className="muted">{due} kelime tekrar bekliyor</p><Link className="btn small" href="/vocabulary">Kelime çalış →</Link></section>
-      <section className="panel"><p className="muted">AI DERSLERİM</p><p className="stat">{aiLessons.count ?? 0} ders</p><Link className="btn small" href="/lessons">AI ile yeni ders →</Link></section>
+
+  return <main className="wrap dashboard">
+    <header className="dashboard-hero">
+      <div className="dashboard-hero-copy">
+        <div className="eyebrow"><span className="eyebrow-dot" /> DEUTSCHAI · ÖĞRENME MERKEZİ</div>
+        <h1>Guten Tag{profile.display_name ? `, ${profile.display_name}` : ""}</h1>
+        <p>Bugünkü küçük adımın, Almanca hedefini biraz daha yaklaştırsın.</p>
+        <div className="learner-meta">
+          <span><small>MEVCUT SEVİYE</small><b>{profile.cefr_level || "Belirlenmedi"}</b></span>
+          <span><small>HEDEF</small><b>Goethe {profile.target_level}</b></span>
+          <span><small>TOPLAM XP</small><b>{profile.xp}</b></span>
+        </div>
+      </div>
+      <div className="hero-action-card">
+        <div className="hero-action-icon">✦</div>
+        <div><span className="eyebrow">BUGÜNÜN ADIMI</span><h2>{todayPlan?.focus || "Almancaya başla"}</h2></div>
+        <p>{todayPlan ? `${todayPlan.minutes} dakikalık kişisel çalışma planın hazır.` : "AI öğretmeninle hedeflerine uygun ilk dersini oluştur."}</p>
+        <Link className="btn" href={todayPlan ? "/lessons" : "/learn"}>{todayPlan ? "Derse devam et" : "İlk dersini oluştur"} <span aria-hidden="true">↗</span></Link>
+      </div>
+    </header>
+
+    {profile.admin_goal && <section className="notice-card"><span className="notice-mark">i</span><div><b>Öğretmeninin notu</b><p>{profile.admin_goal}</p></div></section>}
+    {(task.data || []).length > 0 && <section className="notice-card"><span className="notice-mark">!</span><div><b>Yeni görev</b>{(task.data || []).map((t: any, i: number) => <p key={i}>{t.title}{t.body ? ` — ${t.body}` : ""}</p>)}<Link href="/notifications">Tüm bildirimler <span aria-hidden="true">→</span></Link></div></section>}
+
+    <div className="section-heading"><div><span className="eyebrow">AKTİVİTE</span><h2>Öğrenme özeti</h2></div><span className="date-label">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date())}</span></div>
+    <div className="metric-grid">
+      <section className="metric-card metric-primary"><div className="metric-top"><span>GÜNLÜK HEDEF</span><span className="metric-icon">◷</span></div><p className="metric-value">{todayMin}<small> / {profile.daily_minutes} dk</small></p><div className="bar"><i style={{ width: `${goalPct}%` }} /></div><p className="metric-caption">Bugünkü hedefin %{goalPct} tamamlandı</p></section>
+      <section className="metric-card"><div className="metric-top"><span>ÇALIŞMA SERİSİ</span><span className="metric-icon">↗</span></div><p className="metric-value">{streak}<small> gün</small></p><p className="metric-caption">Bu hafta {weekMin} dk · Toplam {totalMin} dk</p></section>
+      <section className="metric-card"><div className="metric-top"><span>KELİME HAFIZASI</span><span className="metric-icon">Aa</span></div><p className="metric-value">{learned}<small> / {vocabTotal.count ?? 0}</small></p><p className="metric-caption">{due > 0 ? `${due} kelime tekrar bekliyor` : "Tekrar gerektiren kelime yok"}</p></section>
+      <section className="metric-card"><div className="metric-top"><span>AI DERSLERİ</span><span className="metric-icon">✦</span></div><p className="metric-value">{aiLessons.count ?? 0}<small> ders</small></p><p className="metric-caption"><Link href="/lessons">Ders arşivini görüntüle →</Link></p></section>
     </div>
-    <section className="panel"><p className="muted">BUGÜNÜN PLANI</p>
-      {todayPlan ? <><h2>{todayPlan.day}: {todayPlan.focus}</h2><p className="muted">{todayPlan.minutes} dakika · {plan.data?.plan?.weekly_focus}</p></> : <p className="muted">Aktif plan yok.</p>}
-      <PlanButton />
-    </section>
-    {goethe?.weeks?.length > 0 && <section className="panel"><h2>Goethe {goethe.exam_level} hazırlık programı</h2>{goethe.weeks.map((w: any) => <details key={w.week}><summary>{w.week}. hafta — {w.focus}</summary><p>{(w.skills || []).join(" · ")}</p><p className="muted">{w.practice}</p></details>)}</section>}
-    <section className="panel"><h2>Beceri durumu</h2><p className="muted">Son seviye tespitine göre (sınav sonuçları İlerleme sayfasında).</p>
-      {Object.keys(SKILL_LABEL).map(k => <div key={k} style={{ margin: "10px 0" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span>{SKILL_LABEL[k]}</span><span className="muted">{scores[k] == null ? "Henüz ölçülmedi" : `%${scores[k]}`}</span></div><div className="bar"><i style={{ width: `${scores[k] ?? 0}%` }} /></div></div>)}
-    </section>
-    <section className="panel"><h2>Son denemeler</h2>
-      {(exams.data || []).length ? <ul>{(exams.data || []).map((e: any, i: number) => <li key={i}>%{e.pct} — {new Date(e.created_at).toLocaleDateString("tr-TR")}</li>)}</ul> : <p className="muted">Henüz deneme sınavı çözmedin.</p>}
-      <Link className="btn small" href="/exam">Deneme sınavı →</Link> <Link className="btn ghost small" href="/assessment">Seviye testini tekrarla</Link>
-    </section>
+
+    <div className="dashboard-columns">
+      <section className="content-card plan-card">
+        <div className="section-heading"><div><span className="eyebrow">KİŞİSEL PROGRAM</span><h2>Bugünkü çalışma planın</h2></div><span className="plan-duration">{todayPlan?.minutes ?? profile.daily_minutes} dk</span></div>
+        {todayPlan ? <><h3>{todayPlan.day}: {todayPlan.focus}</h3><p className="muted">{plan.data?.plan?.weekly_focus || "Bu hafta Almanca becerilerini dengeli biçimde geliştir."}</p></> : <p className="muted">Henüz aktif bir çalışma planı oluşturulmamış. AI öğretmenin seviyene göre bir program hazırlayabilir.</p>}
+        <div className="plan-actions"><PlanButton /><Link className="text-link" href="/learn">AI öğretmenle çalış <span aria-hidden="true">→</span></Link></div>
+      </section>
+      <section className="content-card quick-card">
+        <span className="eyebrow">HIZLI BAŞLANGIÇ</span><h2>Bugün ne çalışalım?</h2><p className="muted">Bir beceri seç, kaldığın yerden devam et.</p>
+        <div className="quick-links">
+          <Link href="/vocabulary"><span className="quick-link-icon">Aa</span><span><b>Kelime tekrarı</b><small>{due} kelime hazır</small></span><span className="quick-arrow">↗</span></Link>
+          <Link href="/practice/lesen"><span className="quick-link-icon">文</span><span><b>Okuma pratiği</b><small>Metinlerle Almanca</small></span><span className="quick-arrow">↗</span></Link>
+          <Link href="/exam"><span className="quick-link-icon">✓</span><span><b>Deneme sınavı</b><small>Goethe formatında</small></span><span className="quick-arrow">↗</span></Link>
+        </div>
+      </section>
+    </div>
+
+    {goethe?.weeks?.length > 0 && <section className="content-card goethe-card"><div className="section-heading"><div><span className="eyebrow">SINAV HAZIRLIĞI</span><h2>Goethe {goethe.exam_level} yol haritan</h2></div><Link href="/exam" className="text-link">Sınav pratiğine git →</Link></div><div className="goethe-weeks">{goethe.weeks.slice(0, 4).map((w: any) => <details key={w.week}><summary><span>0{w.week}</span><b>{w.focus}</b></summary><p>{(w.skills || []).join(" · ")}</p><p className="muted">{w.practice}</p></details>)}</div></section>}
+
+    <div className="dashboard-columns">
+      <section className="content-card skills-card"><div className="section-heading"><div><span className="eyebrow">SEVİYE TESPİTİ</span><h2>Beceri görünümü</h2></div><Link href="/progress" className="text-link">Tüm ilerleme →</Link></div><p className="muted">Son seviye tespitindeki sonuçların.</p>
+        {Object.keys(SKILL_LABEL).map(k => <div className="skill-row" key={k}><div className="skill-label"><span>{SKILL_LABEL[k]}</span><b>{scores[k] == null ? "—" : `%${scores[k]}`}</b></div><div className="bar"><i style={{ width: `${scores[k] ?? 0}%` }} /></div></div>)}
+      </section>
+      <section className="content-card exam-card"><div className="section-heading"><div><span className="eyebrow">DENEME SONUÇLARI</span><h2>Son sınavların</h2></div></div>
+        {(exams.data || []).length ? <ul className="exam-list">{(exams.data || []).map((e: any, i: number) => <li key={i}><span className="exam-score">%{e.pct}</span><span>{new Date(e.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}</span></li>)}</ul> : <p className="muted">Henüz deneme sınavı çözmedin. İlk denemenle seviyeni gör.</p>}
+        <Link className="btn secondary-btn" href="/exam">Deneme sınavına geç <span aria-hidden="true">→</span></Link>
+        {asm.data && <Link className="text-link retake-link" href="/assessment">Seviye tespitini tekrarla</Link>}
+      </section>
+    </div>
   </main>;
 }
-import PlanButton from "@/components/PlanButton";
