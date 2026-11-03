@@ -6,8 +6,18 @@ export const aiAssessmentSchema=z.object({level:z.enum(["A1","A2"]),summary:z.st
 export const chatSchema=z.object({message:z.string().trim().min(1).max(4000),level:z.string().max(40).default("A1")});
 type AIConfig = { provider: "gemini" | "openai"; apiKey: string; model: string };
 
-/** Reads encrypted dashboard settings first; Vercel environment variables remain the fallback. */
-export async function getAIConfig(): Promise<AIConfig> {
+/** Each signed-in learner uses their own encrypted provider credential. */
+export async function getAIConfig(userId?: string, userDb?: any): Promise<AIConfig> {
+  if (userId) {
+    if (!userDb) throw new Error("Kullanıcı AI ayarı okunamadı.");
+    const { data, error } = await userDb.from("user_ai_settings")
+      .select("provider,model,api_key_ciphertext").eq("user_id", userId).maybeSingle();
+    if (error) throw new Error("Kişisel AI ayarları okunamadı. Supabase 0007 migration dosyasını çalıştır.");
+    if (!data?.api_key_ciphertext) throw new Error("Önce kendi Gemini veya OpenAI API anahtarını ekle.");
+    return { provider: data.provider, model: data.model, apiKey: decryptSecret(data.api_key_ciphertext) };
+  }
+
+  // Legacy global settings are retained only for the administrator's connection test.
   let stored: { provider?: string; model?: string; api_key_ciphertext?: string } | null = null;
   try {
     const { data } = await supabaseAdmin().from("platform_ai_settings")
@@ -25,8 +35,8 @@ export async function getAIConfig(): Promise<AIConfig> {
   return { provider, apiKey, model };
 }
 
-export async function askAI(system:string,prompt:string,json=false){
-  const config = await getAIConfig();
+export async function askAI(system:string,prompt:string,json=false,userId?:string,userDb?:any){
+  const config = await getAIConfig(userId,userDb);
   let response:Response;
   if(config.provider==="openai"){
     response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${config.apiKey}`,"Content-Type":"application/json"},signal:AbortSignal.timeout(30000),body:JSON.stringify({max_tokens:2500,model:config.model,messages:[{role:"system",content:system},{role:"user",content:prompt}],...(json?{response_format:{type:"json_object"}}:{})})});
@@ -44,3 +54,4 @@ export const planSchema=planShape;
 export const assessmentAISchema=z.object({summary:z.string().max(2000),writing_score:z.number().int().min(0).max(100).nullable().default(null),strengths:z.array(z.string().max(300)).max(8).default([]),weaknesses:z.array(z.string().max(300)).max(8).default([]),plan:planShape});
 const sc=z.number().int().min(0).max(100);
 export const writingResultSchema=z.object({level:z.enum(["A1","A2"]),corrected:z.string().max(6000),errors:z.array(z.object({original:z.string().max(300),fix:z.string().max(300),reason:z.string().max(400)})).max(15).default([]),scores:z.object({grammar:sc,vocabulary:sc,structure:sc,spelling:sc,coherence:sc,task:sc}),alternatives:z.array(z.string().max(300)).max(5).default([]),feedback:z.string().max(1500)});
+
