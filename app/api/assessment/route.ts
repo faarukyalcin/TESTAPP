@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   try {
     const raw = await askAI(
       `You are a cautious German placement tutor for Turkish speakers. The assessed current level is ${level}; do not change it. The student's Goethe goal is ${targetLevel}. Return JSON only: {level:"${level}",summary,writing_score,strengths,weaknesses,plan:{weekly_focus,summary,daily_words,days:[{day,focus,minutes}],review_topics,goethe:{exam_level:"${targetLevel}",weeks:[{week,focus,skills,practice}]}}}. Make exactly 7 daily plan entries. Build a realistic ${examWeeks}-week Goethe ${targetLevel} preparation roadmap, with separate Hören, Lesen, Schreiben and Sprechen practice across the weeks, mock tests and review. writing_score is 0-100 for the German self-introduction (null if empty). Speaking was not tested orally; say so honestly. Explain results in Turkish.`,
-      JSON.stringify({ level, targetLevel, examWeeks, scores, bySkill: g.bySkill, intro, goal, minutes }), true);
+      JSON.stringify({ level, targetLevel, examWeeks, scores, bySkill: g.bySkill, intro, goal, minutes }), true, c.user.id, c.sb);
     const ai = assessmentAISchema.parse(parseAIJson(raw));
     scores.schreiben = intro.trim() ? ai.writing_score : null;
     const input = { goal, minutes, targetLevel, examWeeks, scores, intro, answered: ids.length, total: g.total, score: g.score };
@@ -56,3 +56,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "AI servisi yanıt vermedi. API anahtarını ve sağlayıcı ayarını kontrol et." }, { status: 502 });
   }
 }
+
