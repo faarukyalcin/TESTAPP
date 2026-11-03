@@ -67,7 +67,7 @@ export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-s
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       <button className="btn" disabled={busy || model.trim().length < 2}>{busy ? "Kaydediliyor…" : "Ayarları kaydet"}</button>
       <button className="btn ghost" type="button" onClick={testConnection} disabled={testing || !saved || !status?.keyConfigured}>{testing ? "Bağlantı test ediliyor…" : "Gerçek AI bağlantısını test et"}</button>
-      {continueTo && verified && <a className="btn" href={continueTo}>Bağlantı doğrulandı · seviye sınavına geç →</a>}
+      {continueTo && saved && status?.keyConfigured && <a className="btn" href={continueTo}>{verified ? "Bağlantı doğrulandı · seviye sınavına geç →" : "Seviye tespitine geç → (AI testini tekrar deneyebilirsin)"}</a>}
     </div>
   </form>;
 }
