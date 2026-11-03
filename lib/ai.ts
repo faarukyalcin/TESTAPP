@@ -46,10 +46,17 @@ export async function askAI(system:string,prompt:string,json=false,userId?:strin
   const generationConfig:any={temperature:.35,maxOutputTokens:4096,...(json?{responseMimeType:"application/json"}:{})};
   // Gemini 3/4 defaults to medium reasoning. Low is faster for tutoring and plan generation.
   if (/^gemini-(3|4)/.test(config.model)) generationConfig.thinkingConfig={thinkingLevel:"low"};
-  const geminiUrl=`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`;
-  const geminiRequest=()=>fetch(geminiUrl,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":config.apiKey},signal:AbortSignal.timeout(60000),body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig})});
-  response=await geminiRequest();
-  if(response.status===503){await new Promise(resolve=>setTimeout(resolve,1500));response=await geminiRequest();}
+  const geminiRequest=(model:string, configForModel=generationConfig)=>fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":config.apiKey},signal:AbortSignal.timeout(60000),body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:configForModel})});
+  response=await geminiRequest(config.model);
+  if(response.status===503){await new Promise(resolve=>setTimeout(resolve,1500));response=await geminiRequest(config.model);}
+  // Gemini 3.8 Flash can return 503 during capacity spikes. Retry eligible default-model
+  // requests with Google's stable, lower-latency Flash-Lite model using the same user key.
+  if(response.status===503 && config.model==="gemini-3.8-flash"){
+    console.warn("Gemini 3.8 Flash is overloaded; retrying with gemini-3.5-flash-lite");
+    const fallbackConfig={...generationConfig};
+    delete fallbackConfig.thinkingConfig;
+    response=await geminiRequest("gemini-3.5-flash-lite",fallbackConfig);
+  }
   if(!response.ok){const d=await response.json().catch(()=>null);throw Error(`Gemini ${response.status}: ${d?.error?.message||"İstek reddedildi."}`);}
   const d=await response.json(); return (d.candidates?.[0]?.content?.parts||[]).map((p:{text?:string})=>p.text||"").join("");
 }
