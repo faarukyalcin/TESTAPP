@@ -16,9 +16,14 @@ export async function GET() {
     .select("provider,model,api_key_ciphertext,updated_at")
     .eq("user_id", c.user.id).maybeSingle();
   if (error) return NextResponse.json({ error: "Kişisel AI ayarları okunamadı. Supabase 0007 migration dosyasını çalıştır." }, { status: 503 });
+  let model = data?.model || "gemini-3.8-flash";
+  if (data?.provider === "gemini" && model === "gemini-2.5-flash") {
+    model = "gemini-3.8-flash";
+    await c.sb.from("user_ai_settings").update({ model, updated_at: new Date().toISOString() }).eq("user_id", c.user.id);
+  }
   return NextResponse.json({
     provider: data?.provider || "gemini",
-    model: data?.model || "gemini-2.5-flash",
+    model,
     keyConfigured: Boolean(data?.api_key_ciphertext),
     keySource: data?.api_key_ciphertext ? "dashboard" : "missing",
     encryptionReady: /^[a-f0-9]{64}$/i.test(process.env.APP_ENCRYPTION_KEY || ""),
