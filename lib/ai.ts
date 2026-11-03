@@ -7,14 +7,26 @@ export const chatSchema=z.object({message:z.string().trim().min(1).max(4000),lev
 type AIConfig = { provider: "gemini" | "openai"; apiKey: string; model: string };
 
 /** Each signed-in learner uses their own encrypted provider credential. */
-export async function getAIConfig(userId?: string, userDb?: any): Promise<AIConfig> {
+export async function getAIConfig(userId?: string, userDb?: any, providerOverride?: "gemini" | "openai" | "jarvis"): Promise<AIConfig> {
   if (userId) {
     if (!userDb) throw new Error("Kullanıcı AI ayarı okunamadı.");
     const { data, error } = await userDb.from("user_ai_settings")
-      .select("provider,model,api_key_ciphertext").eq("user_id", userId).maybeSingle();
-    if (error) throw new Error("Kişisel AI ayarları okunamadı. Supabase 0007 migration dosyasını çalıştır.");
+      .select("provider,model,api_key_ciphertext,jarvis_provider,gemini_model,gemini_api_key_ciphertext,openai_model,openai_api_key_ciphertext").eq("user_id", userId).maybeSingle();
+    if (error) {
+      if (providerOverride === "jarvis") throw new Error("Jarvis için çift sağlayıcı ayarı eksik. Supabase 0008_jarvis_dual_ai_providers.sql migration dosyasını çalıştır.");
+      const legacy = await userDb.from("user_ai_settings").select("provider,model,api_key_ciphertext").eq("user_id", userId).maybeSingle();
+      if (legacy.error) throw new Error("Kişisel AI ayarları okunamadı. Supabase 0007 migration dosyasını çalıştır.");
+      if (!legacy.data?.api_key_ciphertext) throw new Error("Önce kendi Gemini veya OpenAI API anahtarını ekle.");
+      return { provider: legacy.data.provider, apiKey: decryptSecret(legacy.data.api_key_ciphertext), model: legacy.data.model };
+    }
     if (!data?.api_key_ciphertext) throw new Error("Önce kendi Gemini veya OpenAI API anahtarını ekle.");
-    return { provider: data.provider, model: data.model, apiKey: decryptSecret(data.api_key_ciphertext) };
+    const provider = providerOverride === "jarvis" ? (data.jarvis_provider || "openai") : providerOverride || data.provider;
+    const providerCipher = provider === "openai" ? data.openai_api_key_ciphertext : data.gemini_api_key_ciphertext;
+    const apiKeyCiphertext = providerCipher || (data.provider === provider ? data.api_key_ciphertext : null);
+    if (!apiKeyCiphertext) throw new Error(`${provider === "openai" ? "OpenAI" : "Gemini"} anahtarını Jarvis için AI ayarlarından ekle.`);
+    const model = (provider === "openai" ? data.openai_model : data.gemini_model)
+      || (data.provider === provider ? data.model : provider === "openai" ? "gpt-4.1-mini" : "gemini-3.8-flash");
+    return { provider, model, apiKey: decryptSecret(apiKeyCiphertext) };
   }
 
   // Legacy global settings are retained only for the administrator's connection test.
@@ -35,8 +47,8 @@ export async function getAIConfig(userId?: string, userDb?: any): Promise<AIConf
   return { provider, apiKey, model };
 }
 
-export async function askAI(system:string,prompt:string,json=false,userId?:string,userDb?:any){
-  const config = await getAIConfig(userId,userDb);
+export async function askAI(system:string,prompt:string,json=false,userId?:string,userDb?:any,providerOverride?: "gemini" | "openai" | "jarvis"){
+  const config = await getAIConfig(userId,userDb,providerOverride);
   let response:Response;
   if(config.provider==="openai"){
     response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${config.apiKey}`,"Content-Type":"application/json"},signal:AbortSignal.timeout(60000),body:JSON.stringify({max_tokens:2500,model:config.model,messages:[{role:"system",content:system},{role:"user",content:prompt}],...(json?{response_format:{type:"json_object"}}:{})})});

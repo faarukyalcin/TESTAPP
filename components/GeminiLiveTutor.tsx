@@ -192,17 +192,16 @@ export default function GeminiLiveTutor({ level }: { level: "A1" | "A2" }) {
       setStatus("Gemini Live bağlanıyor…");
 
       await new Promise<void>((resolve, reject) => {
-        const setupTimer = window.setTimeout(() => reject(new Error("Gemini Live zamanında bağlanmadı. Tekrar dene.")), 20000);
+        const setupTimer = window.setTimeout(() => reject(new Error("Gemini Live 45 saniye içinde oturum kurmadı. Gemini Live erişimini kontrol et veya Jarvis motorundan ChatGPT'yi seç.")), 45000);
         socket.onerror = () => { window.clearTimeout(setupTimer); reject(new Error("Gemini Live bağlantısı kurulamadı. API anahtarını ve Gemini Live erişimini kontrol et.")); };
-        socket.onclose = () => { window.clearTimeout(setupTimer); if (!active) reject(new Error("Canlı bağlantı kapandı.")); };
+        socket.onclose = event => { window.clearTimeout(setupTimer); reject(new Error(`Gemini Live oturumu setup tamamlanmadan kapandı (${event.code}).`)); };
         socket.onopen = () => {
+          setStatus("Gemini bağlantısı açıldı; oturum ayarlanıyor…");
           socket.send(JSON.stringify({
             setup: {
-              model: MODEL,
-              generationConfig: {
-                responseModalities: ["AUDIO"],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
-              },
+              model: typeof tokenData.model === "string" ? tokenData.model : MODEL,
+              sessionResumption: {},
+              responseModalities: ["AUDIO"],
               systemInstruction: { parts: [{ text: "Du bist ein freundlicher, geduldiger Deutschlehrer für türkischsprachige Lernende auf CEFR " + level + ". Übe mit dem Lernenden ein natürliches Gespräch im Szenario: " + SCENARIOS[scenario] + ". Sprich langsam und in kurzen, einfachen deutschen Sätzen auf dem Niveau " + level + ". Warte auf Antworten. Wenn der Lernende einen Grammatik- oder Wortfehler macht, wiederhole zuerst den korrigierten deutschen Satz und erkläre die Regel kurz auf Türkisch. Stelle danach genau eine passende kurze Frage auf Deutsch. Ermutige den Lernenden, aber gib nicht nur lange Vorträge. Wenn der Lernende Türkisch spricht, antworte kurz auf Türkisch und leite ihn zurück ins Deutsche." }] },
               inputAudioTranscription: {},
               outputAudioTranscription: {},

@@ -49,7 +49,7 @@ export async function buildAndActivateLearningPlan(userId: string, profile: Prof
   try {
     const raw = await askAI(
       "You are a German and Goethe exam planner for Turkish A1/A2 learners. Using only the real data given, return JSON matching {weekly_focus,summary,daily_words,days:[{day,focus,minutes}],review_topics,goethe:{exam_level,weeks:[{week,focus,skills,practice}]}}. Include exactly 7 daily entries, use target level A1/A2, and make a realistic 12-week Goethe roadmap rotating Hören, Lesen, Schreiben, Sprechen, mock exams and review. Prioritise measured weaknesses and adapt the current plan: change the sequence or emphasis, keep useful parts only when progress data supports them. Explain in Turkish.",
-      JSON.stringify(data), true, userId, sb
+      JSON.stringify(data), true, userId, sb, "jarvis"
     );
     plan = planSchema.parse(parseAIJson(raw));
   } catch (error) {

@@ -229,6 +229,11 @@ create table if not exists public.user_ai_settings (
   provider text not null check (provider in ('gemini', 'openai')),
   model text not null,
   api_key_ciphertext text not null,
+  jarvis_provider text not null default 'openai' check (jarvis_provider in ('gemini', 'openai')),
+  gemini_model text,
+  gemini_api_key_ciphertext text,
+  openai_model text,
+  openai_api_key_ciphertext text,
   updated_at timestamptz not null default now()
 );
 alter table public.platform_ai_settings enable row level security;

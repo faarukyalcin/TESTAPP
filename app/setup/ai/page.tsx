@@ -10,7 +10,7 @@ export default async function AISetup() {
   return <main className="wrap" style={{ maxWidth: 820, paddingTop: "6vh" }}>
     <div className="brand">Deutsch<b>AI</b></div>
     <h1>Kendi AI öğretmenini bağla</h1>
-    <p className="muted">Gemini veya OpenAI hesabından aldığın API anahtarını ekle. Anahtarın hesabına özel, şifrelenmiş olarak saklanır. Bağlantı testinden sonra seviye sınavına geçebilirsin.</p>
+    <p className="muted">OpenAI ChatGPT ve Google Gemini anahtarlarını ayrı ayrı ekleyebilirsin. Jarvis’in sistemi hangi sağlayıcıyla yöneteceğini AI öğretmen sayfasından seçersin. Anahtarlar hesabına özel, şifrelenmiş olarak saklanır.</p>
     <AISettingsForm endpoint="/api/user-ai-settings" continueTo="/assessment" />
     {configured && <p className="ok">Kişisel AI bağlantın hazır. <a href="/assessment">Seviye tespit sınavına geç →</a></p>}
   </main>;

@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type Settings = { provider: "gemini" | "openai"; model: string; keyConfigured: boolean; keySource: "dashboard" | "vercel" | "missing"; encryptionReady?: boolean; updatedAt: string | null };
+type Provider = "gemini" | "openai";
+type Settings = { provider: Provider; model: string; keyConfigured: boolean; keySource?: "dashboard" | "vercel" | "missing"; encryptionReady?: boolean; updatedAt: string | null; dualProviderReady?: boolean; jarvisProvider?: Provider; providers?: Record<Provider, { model: string; keyConfigured: boolean }> };
 const MODELS = { gemini: "gemini-3.8-flash", openai: "gpt-4.1-mini" };
 async function responseJson(r: Response) {
   return r.json().catch(() => ({ error: `Sunucu geçerli JSON döndürmedi (HTTP ${r.status}). Vercel API ayarlarını kontrol et.` }));
 }
 
 export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-settings" }: { continueTo?: string; endpoint?: string }) {
-  const [provider, setProvider] = useState<"gemini" | "openai">("gemini");
+  const [provider, setProvider] = useState<Provider>("openai");
   const [model, setModel] = useState(MODELS.gemini);
   const [apiKey, setApiKey] = useState("");
   const [status, setStatus] = useState<Settings | null>(null);
@@ -33,7 +34,7 @@ export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-s
       const d = await responseJson(r); if (!r.ok) throw new Error(d.error || "Kaydedilemedi.");
       setApiKey(""); setMessage("AI sağlayıcı ayarları kaydedildi.");
       setVerified(false); setSaved(true);
-      setStatus({ provider, model, keyConfigured: d.keyConfigured, keySource: "dashboard", updatedAt: new Date().toISOString() });
+      setStatus({ ...d, provider, model, keyConfigured: d.keyConfigured, keySource: "dashboard", updatedAt: new Date().toISOString() });
       setBusy(false);
       setTesting(true);
       setMessage("Ayar kaydedildi, bağlantı test ediliyor…");
@@ -59,11 +60,11 @@ export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-s
   }
 
   return <form className="panel" onSubmit={save} style={{ maxWidth: 720 }}>
-    <div className="field"><label>AI sağlayıcısı</label><select value={provider} onChange={e => { const v = e.target.value as "gemini" | "openai"; setProvider(v); setModel(MODELS[v]); setApiKey(""); setVerified(false); setSaved(false); }}><option value="gemini">Google Gemini</option><option value="openai">OpenAI ChatGPT</option></select></div>
+    <div className="field"><label>AI sağlayıcısı</label><select value={provider} onChange={e => { const v = e.target.value as Provider; setProvider(v); setModel(status?.providers?.[v]?.model || MODELS[v]); setApiKey(""); setVerified(false); setSaved(false); }}><option value="gemini">Google Gemini</option><option value="openai">OpenAI ChatGPT</option></select></div>
     <div className="field"><label>Model adı</label><input value={model} onChange={e => { setModel(e.target.value); setVerified(false); setSaved(false); }} maxLength={100} required /></div>
-    <div className="field"><label>{provider === "gemini" ? "Gemini API anahtarı" : "OpenAI API anahtarı"}</label><input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); if (e.target.value) { setVerified(false); setSaved(false); } }} autoComplete="new-password" placeholder={status?.keyConfigured ? "Kayıtlı anahtarı değiştirmek için yenisini gir" : "API anahtarını buraya yapıştır"} maxLength={500} /></div>
-    <p className="muted">Güvenlik: Kayıtlı anahtar tekrar gösterilmez. Şifrelenmiş olarak veritabanında saklanır; şifreleme anahtarı yalnızca Vercel sunucu ortam değişkeninde bulunur.</p>
-    {status && <p className="muted">Durum: {status.keyConfigured ? `API anahtarı hazır (${status.keySource === "dashboard" ? "panelden kaydedildi" : "Vercel ortam değişkeninden geliyor"})` : status.keySource === "dashboard" && status.encryptionReady === false ? "Kayıtlı anahtar var ancak APP_ENCRYPTION_KEY eksik veya geçersiz." : "API anahtarı henüz tanımlanmadı."}</p>}
+    <div className="field"><label>{provider === "gemini" ? "Gemini API anahtarı" : "OpenAI API anahtarı"}</label><input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); if (e.target.value) { setVerified(false); setSaved(false); } }} autoComplete="new-password" placeholder={status?.providers?.[provider]?.keyConfigured ? "Bu motor için anahtar kayıtlı; değiştirmek istersen yenisini gir" : "API anahtarını buraya yapıştır"} maxLength={500} /></div>
+    <p className="muted">ChatGPT ve Gemini anahtarları ayrı, şifreli saklanır. Jarvis ekranında hangi motorun asistanı yöneteceğini seçebilirsin. Kayıtlı anahtar tekrar gösterilmez.</p>
+    {status && <p className="muted">Bu motor: {status.providers?.[provider]?.keyConfigured ? "API anahtarı hazır" : status.encryptionReady === false ? "APP_ENCRYPTION_KEY eksik veya geçersiz" : "API anahtarı henüz tanımlanmadı."}{status.dualProviderReady === false && " · İki motoru saklamak için Supabase 0008 migration gerekli."}</p>}
     {error && <p className="error">{error}</p>}{message && <p className="ok">{message}</p>}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       <button className="btn" disabled={busy || testing || model.trim().length < 2}>{busy ? "Kaydediliyor…" : testing ? "Bağlantı test ediliyor…" : "Ayarları kaydet"}</button>

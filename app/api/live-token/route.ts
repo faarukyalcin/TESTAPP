@@ -12,8 +12,9 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const scenario = typeof body?.scenario === "string" && ["vorstellen", "einkaufen", "restaurant", "arzt", "weg"].includes(body.scenario) ? body.scenario : "vorstellen";
   const level = c.profile.cefr_level === "A2" ? "A2" : "A1";
-  const config = await getAIConfig(c.user.id, c.sb).catch(() => null);
-  if (!config) return NextResponse.json({ error: "Önce AI ayarlarından kendi sağlayıcını ve API anahtarını kaydet." }, { status: 400 });
+  let config;
+  try { config = await getAIConfig(c.user.id, c.sb, "jarvis"); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Jarvis API ayarlarını kontrol et." }, { status: 400 }); }
   const limitKey = config.provider === "openai" ? "openai-live" : "gemini-live";
   if (!(await aiAllowed(c.user.id, limitKey, 8))) {
     return NextResponse.json({ error: "Canlı konuşma oturum sınırına ulaştın. Biraz sonra tekrar dene." }, { status: 429 });
@@ -60,7 +61,11 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         uses: 1,
         expireTime: new Date(now + 15 * 60 * 1000).toISOString(),
-        newSessionExpireTime: new Date(now + 60 * 1000).toISOString()
+        newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
+        liveConnectConstraints: {
+          model: MODEL,
+          config: { responseModalities: ["AUDIO"], sessionResumption: {} }
+        }
       })
     });
     const data = await response.json().catch(() => null);

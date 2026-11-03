@@ -424,6 +424,18 @@ button, input, select, textarea { accent-color: var(--accent); }
 .grammar-result-score { margin: 9px 0 14px; color: var(--accent); font-size: 23px; letter-spacing: -.04em; }
 .grammar-result-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
 
+.jarvis-control-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); gap: 18px 30px; align-items: center; margin: 20px 0; padding: 23px 25px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); border-radius: 17px; background: linear-gradient(120deg, var(--panel), color-mix(in srgb, var(--accent-soft) 46%, var(--panel))); box-shadow: var(--shadow); }
+.jarvis-control-copy h2 { margin: 8px 0 5px; font-size: clamp(18px, 2.2vw, 23px); letter-spacing: -.035em; }
+.jarvis-control-copy p { max-width: 680px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.jarvis-provider-select { display: grid; gap: 7px; }
+.jarvis-provider-select label { color: var(--muted); font-size: 10px; font-weight: 740; letter-spacing: .08em; text-transform: uppercase; }
+.jarvis-provider-select select { min-height: 43px; }
+.jarvis-provider-select a { color: var(--accent-strong); font-size: 11px; font-weight: 700; text-decoration: none; }
+[data-theme="dark"] .jarvis-provider-select a { color: var(--accent); }
+.jarvis-migration-hint { grid-column: 1 / -1; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.6; }
+.jarvis-migration-hint code { color: var(--text); font-size: 10px; }
+@media (max-width: 650px) { .jarvis-control-card { grid-template-columns: 1fr; gap: 14px; padding: 18px; } }
+
 @media (max-width: 1050px) {
   .grammar-topic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grammar-topic-columns { grid-template-columns: minmax(0, 1fr) 245px; gap: 14px; }
