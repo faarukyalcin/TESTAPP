@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Sağlayıcı, model veya API anahtarı geçersiz." }, { status: 400 });
-  if (parsed.data.apiKey && /[^\\x00-\\x7F]/.test(parsed.data.apiKey)) return NextResponse.json({ error: "API anahtarında geçersiz karakter var. Anahtarı sağlayıcı panelinden yeniden kopyala; açıklama veya tırnak işareti ekleme." }, { status: 400 });
+  if (parsed.data.apiKey && /[^\x00-\x7F]/.test(parsed.data.apiKey)) return NextResponse.json({ error: "API anahtarında geçersiz karakter var. Anahtarı sağlayıcı panelinden yeniden kopyala; açıklama veya tırnak işareti ekleme." }, { status: 400 });
   const { data: current, error: readError } = await c.sb.from("user_ai_settings")
     .select("provider,api_key_ciphertext").eq("user_id", c.user.id).maybeSingle();
   if (readError) return NextResponse.json({ error: "Kişisel AI ayarları okunamadı. Supabase 0007 migration dosyasını çalıştır." }, { status: 503 });
