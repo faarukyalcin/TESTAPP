@@ -34,8 +34,15 @@ export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-s
       setApiKey(""); setMessage("AI sağlayıcı ayarları kaydedildi.");
       setVerified(false); setSaved(true);
       setStatus({ provider, model, keyConfigured: d.keyConfigured, keySource: "dashboard", updatedAt: new Date().toISOString() });
+      setTesting(true);
+      setMessage("Ayar kaydedildi, bağlantı test ediliyor…");
+      const test = await fetch(`${endpoint}/test`, { method: "POST" });
+      const result = await responseJson(test);
+      if (!test.ok) throw new Error(result.error || "AI bağlantısı test edilemedi.");
+      setVerified(true);
+      setMessage(`Bağlantı başarılı · ${result.latencyMs} ms · ${result.reply}`);
     } catch (e) { setError(e instanceof Error ? e.message : "Kaydedilemedi."); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setTesting(false); }
   }
 
   async function testConnection() {
