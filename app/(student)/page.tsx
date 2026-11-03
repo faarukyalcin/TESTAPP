@@ -5,12 +5,11 @@ import { dayKey, streakFromDates, SKILL_LABEL, pct } from "@/lib/scoring";
 export default async function Home() {
   const { sb, user, profile } = await requireStudent();
   const nowIso = new Date().toISOString();
-  const [study, vocab, vocabTotal, lessons, lessonDone, exams, asm, plan, task] = await Promise.all([
+  const [study, vocab, vocabTotal, aiLessons, exams, asm, plan, task] = await Promise.all([
     sb.from("study_sessions").select("seconds,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5000),
     sb.from("vocabulary_progress").select("learned,due_at").eq("user_id", user.id),
     sb.from("vocabulary").select("id", { count: "exact", head: true }),
-    sb.from("lessons").select("id", { count: "exact", head: true }),
-    sb.from("lesson_progress").select("lesson_id", { count: "exact", head: true }).eq("user_id", user.id),
+    sb.from("ai_lessons").select("id", { count: "exact", head: true }).eq("user_id", user.id),
     sb.from("exam_results").select("pct,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(3),
     sb.from("assessments").select("level,input,summary,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     sb.from("learning_plans").select("plan").eq("user_id", user.id).eq("active", true).order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -39,12 +38,13 @@ export default async function Home() {
       <section className="panel"><p className="muted">BUGÜN</p><p className="stat">{todayMin} / {profile.daily_minutes} dk</p><div className="bar"><i style={{ width: `${goalPct}%` }} /></div><p className="muted">Günlük hedef %{goalPct}</p></section>
       <section className="panel"><p className="muted">ÇALIŞMA SERİSİ</p><p className="stat">{streak} gün 🔥</p><p className="muted">Hafta: {weekMin} dk · Toplam: {totalMin} dk</p></section>
       <section className="panel"><p className="muted">KELİMELER</p><p className="stat">{learned} / {vocabTotal.count ?? 0}</p><p className="muted">{due} kelime tekrar bekliyor</p><Link className="btn small" href="/vocabulary">Kelime çalış →</Link></section>
-      <section className="panel"><p className="muted">DERSLER</p><p className="stat">{lessonDone.count ?? 0} / {lessons.count ?? 0}</p><Link className="btn small" href="/lessons">Derslere git →</Link></section>
+      <section className="panel"><p className="muted">AI DERSLERİM</p><p className="stat">{aiLessons.count ?? 0} ders</p><Link className="btn small" href="/lessons">AI ile yeni ders →</Link></section>
     </div>
     <section className="panel"><p className="muted">BUGÜNÜN PLANI</p>
       {todayPlan ? <><h2>{todayPlan.day}: {todayPlan.focus}</h2><p className="muted">{todayPlan.minutes} dakika · {plan.data?.plan?.weekly_focus}</p></> : <p className="muted">Aktif plan yok.</p>}
       <PlanButton />
     </section>
+    {plan.data?.plan?.goethe?.weeks?.length > 0 && <section className="panel"><h2>Goethe {plan.data.plan.goethe.exam_level} hazırlık programı</h2>{plan.data.plan.goethe.weeks.map((w: any) => <details key={w.week}><summary>{w.week}. hafta — {w.focus}</summary><p>{(w.skills || []).join(" · ")}</p><p className="muted">{w.practice}</p></details>)}</section>}
     <section className="panel"><h2>Beceri durumu</h2><p className="muted">Son seviye tespitine göre (sınav sonuçları İlerleme sayfasında).</p>
       {Object.keys(SKILL_LABEL).map(k => <div key={k} style={{ margin: "10px 0" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span>{SKILL_LABEL[k]}</span><span className="muted">{scores[k] == null ? "Henüz ölçülmedi" : `%${scores[k]}`}</span></div><div className="bar"><i style={{ width: `${scores[k] ?? 0}%` }} /></div></div>)}
     </section>

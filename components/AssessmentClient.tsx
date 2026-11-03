@@ -2,14 +2,14 @@
 import { useState } from "react";
 import Question, { type PQ } from "@/components/Question";
 import { SKILL_LABEL } from "@/lib/scoring";
-type Res = { level: string; summary: string; strengths: string[]; weaknesses: string[]; scores: Record<string, number | null>; readiness: number; plan: { weekly_focus: string; summary: string; days: { day: string; focus: string; minutes: number }[] } };
+type Res = { level: string; summary: string; strengths: string[]; weaknesses: string[]; scores: Record<string, number | null>; readiness: number; plan: { weekly_focus: string; summary: string; days: { day: string; focus: string; minutes: number }[]; goethe?: { exam_level: string; weeks: { week: number; focus: string; skills: string[]; practice: string }[] } } };
 export default function AssessmentClient({ questions, defaultMinutes }: { questions: PQ[]; defaultMinutes: number }) {
-  const [a, setA] = useState<Record<string, string>>({}); const [intro, setIntro] = useState(""); const [goal, setGoal] = useState("Goethe A2 sınavı"); const [minutes, setMinutes] = useState(defaultMinutes || 30);
+  const [a, setA] = useState<Record<string, string>>({}); const [intro, setIntro] = useState(""); const [targetLevel, setTargetLevel] = useState<"A1" | "A2">("A2"); const [examWeeks, setExamWeeks] = useState(12); const [goal, setGoal] = useState("Goethe sınavına hazırlanmak"); const [minutes, setMinutes] = useState(defaultMinutes || 30);
   const [res, setRes] = useState<Res | null>(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   const answered = questions.filter(q => a[q.id]).length;
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setErr("");
-    try { const r = await fetch("/api/assessment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: a, intro, goal, minutes }) }); const d = await r.json(); if (!r.ok) throw Error(d.error); setRes(d.assessment); }
+    try { const r = await fetch("/api/assessment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: a, intro, goal, minutes, targetLevel, examWeeks }) }); const d = await r.json(); if (!r.ok) throw Error(d.error); setRes(d.assessment); }
     catch (x) { setErr(x instanceof Error ? x.message : "Hata"); } finally { setBusy(false); }
   }
   if (res) return <>
@@ -17,11 +17,12 @@ export default function AssessmentClient({ questions, defaultMinutes }: { questi
       {Object.keys(SKILL_LABEL).map(k => <div key={k} style={{ margin: "10px 0" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span>{SKILL_LABEL[k]}</span><span className="muted">{res.scores[k] == null ? "Bu testte ölçülmedi" : `%${res.scores[k]}`}</span></div><div className="bar"><i style={{ width: `${res.scores[k] ?? 0}%` }} /></div></div>)}</section>
     <div className="grid"><section className="panel"><h3>Güçlü yönlerin</h3><ul>{res.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul></section><section className="panel"><h3>Geliştirilecek alanlar</h3><ul>{res.weaknesses.map((s, i) => <li key={i}>{s}</li>)}</ul></section></div>
     <section className="panel"><h3>İlk hafta planın</h3><p>{res.plan.summary}</p>{res.plan.days.map((d, i) => <p key={i}><b>{d.day}</b> — {d.focus} <span className="muted">({d.minutes} dk)</span></p>)}</section>
+    {res.plan.goethe && <section className="panel"><h3>Goethe {res.plan.goethe.exam_level} hazırlık yol haritan</h3>{res.plan.goethe.weeks.map(w => <p key={w.week}><b>{w.week}. hafta</b> — {w.focus}<br/><span className="muted">{w.skills.join(" · ")} — {w.practice}</span></p>)}</section>}
     <a className="btn" href="/">Panele geç →</a></>;
   return <form onSubmit={submit}>
-    {questions.map((q, n) => <section className="panel" key={q.id}><p className="muted">Soru {n + 1} / {questions.length} · {SKILL_LABEL[q.skill]}</p><Question q={q} value={a[q.id] || ""} onChange={v => setA({ ...a, [q.id]: v })} /></section>)}
+    {questions.map((q, n) => <section className="panel" key={q.id}><p className="muted">Soru {n + 1} / {questions.length} · {SKILL_LABEL[q.skill]}</p><Question q={q} value={a[q.id] || ""} onChange={v => setA({ ...a, [q.id]: v })} allowAskTeacher={false} /></section>)}
     <section className="panel"><h2>Kısa yazı</h2><p className="muted">Kendini 3-5 cümleyle Almanca tanıt (Name, Alter, Wohnort, Beruf, Hobby). Bilmiyorsan boş bırakabilirsin.</p><div className="field"><textarea value={intro} onChange={e => setIntro(e.target.value)} maxLength={3000} /></div>
-      <div className="grid"><div className="field"><label>Hedefin</label><input value={goal} onChange={e => setGoal(e.target.value)} maxLength={160} required /></div><div className="field"><label>Günlük çalışma süresi (dk)</label><input type="number" min={10} max={180} value={minutes} onChange={e => setMinutes(Number(e.target.value))} /></div></div></section>
+      <div className="grid"><div className="field"><label>Goethe hedef seviyesi</label><select value={targetLevel} onChange={e => setTargetLevel(e.target.value as "A1" | "A2")}><option value="A1">Goethe A1</option><option value="A2">Goethe A2</option></select></div><div className="field"><label>Sınava kalan süre (hafta)</label><input type="number" min={4} max={52} value={examWeeks} onChange={e => setExamWeeks(Number(e.target.value))} /></div><div className="field"><label>Hedefin</label><input value={goal} onChange={e => setGoal(e.target.value)} maxLength={160} required /></div><div className="field"><label>Günlük çalışma süresi (dk)</label><input type="number" min={10} max={180} value={minutes} onChange={e => setMinutes(Number(e.target.value))} /></div></div></section>
     {err && <p className="error">{err}</p>}
     <button className="btn" disabled={busy || answered < questions.length}>{busy ? "Değerlendiriliyor…" : answered < questions.length ? `${questions.length - answered} soru kaldı` : "Testi bitir"}</button>
   </form>;

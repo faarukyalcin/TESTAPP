@@ -37,7 +37,7 @@ export default function ExamRunner({ defaultLevel }: { defaultLevel: "A1" | "A2"
   return <section className="panel">
     <div style={{ display: "flex", justifyContent: "space-between" }}><b>Soru {i + 1} / {ex.questions.length}</b><b className={left < 60 ? "error" : ""} aria-live="polite">⏱ {mm}:{ss}</b></div>
     <div style={{ margin: "10px 0" }}>{ex.questions.map((x, n) => <button key={x.id} className={`btn small ${n === i ? "" : "ghost"}`} style={{ margin: 2, opacity: ans[x.id] ? 1 : .6 }} onClick={() => setI(n)} aria-label={`Soru ${n + 1}`}>{n + 1}</button>)}</div>
-    <Question q={q} value={ans[q.id] || ""} onChange={v => setAns({ ...ans, [q.id]: v })} />
+    <Question q={q} value={ans[q.id] || ""} onChange={v => setAns({ ...ans, [q.id]: v })} allowAskTeacher={false} />
     {err && <p className="error">{err}</p>}
     <button className="btn ghost" disabled={i === 0} onClick={() => setI(i - 1)}>← Önceki</button>{" "}
     {i < ex.questions.length - 1 ? <button className="btn" onClick={() => setI(i + 1)}>Sonraki →</button> : null}{" "}

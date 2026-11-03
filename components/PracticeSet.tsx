@@ -19,7 +19,7 @@ export default function PracticeSet({ questions }: { questions: PQ[] }) {
   const q = questions[i];
   return <section className="panel">
     <p className="muted">Soru {i + 1} / {questions.length}</p>
-    <Question q={q} value={val} onChange={setVal} locked={!!res} answer={res?.answer} />
+    <Question q={q} value={val} onChange={setVal} locked={!!res} answer={res?.answer} explanation={res?.explanation} />
     {err && <p className="error">{err}</p>}
     {res && <p className={res.correct ? "ok" : "error"}>{res.correct ? "Doğru ✓" : `Yanlış. Doğru cevap: ${res.answer}`}<br /><span className="muted">{res.explanation}</span>{q.audio_text && <><br /><span className="muted">Metin: {q.audio_text}</span></>}</p>}
     {!res ? <button className="btn" disabled={!val || busy} onClick={check}>{busy ? "Kontrol ediliyor…" : "Kontrol et"}</button>

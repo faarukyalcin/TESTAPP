@@ -38,7 +38,8 @@ export async function askAI(system:string,prompt:string,json=false){
   const d=await response.json(); return (d.candidates?.[0]?.content?.parts||[]).map((p:{text?:string})=>p.text||"").join("");
 }
 export function parseAIJson(raw:string){return JSON.parse(raw.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g,"").trim());}
-const planShape=z.object({weekly_focus:z.string().max(300),summary:z.string().max(1500),daily_words:z.number().int().min(0).max(30).default(10),days:z.array(z.object({day:z.string().max(40),focus:z.string().max(300),minutes:z.number().min(0).max(240)})).max(7).default([]),review_topics:z.array(z.string().max(120)).max(8).default([])});
+const goethePlan=z.object({exam_level:z.enum(["A1","A2"]).default("A2"),weeks:z.array(z.object({week:z.number().int().min(1).max(52),focus:z.string().max(200),skills:z.array(z.string().max(40)).max(4),practice:z.string().max(300)})).max(52).default([])});
+const planShape=z.object({weekly_focus:z.string().max(300),summary:z.string().max(1500),daily_words:z.number().int().min(0).max(30).default(10),days:z.array(z.object({day:z.string().max(40),focus:z.string().max(300),minutes:z.number().min(0).max(240)})).max(7).default([]),review_topics:z.array(z.string().max(120)).max(8).default([]),goethe:goethePlan.default({exam_level:"A2",weeks:[]})});
 export const planSchema=planShape;
 export const assessmentAISchema=z.object({summary:z.string().max(2000),writing_score:z.number().int().min(0).max(100).nullable().default(null),strengths:z.array(z.string().max(300)).max(8).default([]),weaknesses:z.array(z.string().max(300)).max(8).default([]),plan:planShape});
 const sc=z.number().int().min(0).max(100);

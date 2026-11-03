@@ -15,7 +15,7 @@ export default function LessonQuiz({ lessonId, questions }: { lessonId: string; 
   }
   return <section className="panel"><h2>Ders sonu testi</h2>
     {questions.map(q => { const r = res?.results.find(x => x.id === q.id); return <div key={q.id} style={{ margin: "18px 0" }}>
-      <Question q={q} value={a[q.id] || ""} onChange={v => setA({ ...a, [q.id]: v })} locked={!!res} answer={r?.answer} />
+      <Question q={q} value={a[q.id] || ""} onChange={v => setA({ ...a, [q.id]: v })} locked={!!res} answer={r?.answer} explanation={r?.explanation} />
       {r && <p className={r.correct ? "ok" : "error"}>{r.correct ? "Doğru ✓" : "Yanlış"} <span className="muted">{r.explanation}</span></p>}</div>; })}
     {err && <p className="error">{err}</p>}
     {res ? <p className="stat">Sonuç: %{res.pct} — ilerlemen kaydedildi.</p> : <button className="btn" disabled={busy || questions.some(q => !a[q.id])} onClick={submit}>{busy ? "Değerlendiriliyor…" : "Testi bitir"}</button>}

@@ -9,8 +9,11 @@ export async function GET(request: Request) {
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
   const rawNext = url.searchParams.get("next") || "/set-password";
-  // Açık yönlendirmeyi önle: yalnızca site içi yollar.
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/set-password";
+  // Açık yönlendirmeyi önle; URL ayrıştırması ters eğik çizgi numaralarını da yakalar.
+  const target = new URL(rawNext, url.origin);
+  const next = rawNext.startsWith("/") && target.origin === url.origin
+    ? target.pathname + target.search + target.hash
+    : "/set-password";
 
   if (!token_hash || !type) return NextResponse.redirect(new URL("/login?error=missing_token", url.origin));
 

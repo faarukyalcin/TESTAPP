@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { getAIConfig } from "@/lib/ai";
 
 export type Profile = {
   id: string; display_name: string | null; role: "admin" | "student"; cefr_level: string | null;
@@ -24,13 +25,14 @@ export async function requireUser() {
   return { ...c, profile: c.profile };
 }
 
-/** Öğrenci sayfaları: seviye tespiti tamamlanmadan geçilemez (adminler muaf). */
+/** Öğrenme sayfaları: AI bağlantısı ve ilk seviye tespiti olmadan açılmaz. */
 export async function requireStudent() {
   const c = await requireUser();
-  if (c.profile.role !== "admin") {
-    const { count } = await c.sb.from("assessments").select("id", { count: "exact", head: true }).eq("user_id", c.user.id);
-    if (!count) redirect("/assessment");
-  }
+  // No learning screen or assessment is available until a real AI provider is connected.
+  try { await getAIConfig(); }
+  catch { redirect("/setup/ai"); }
+  const { count } = await c.sb.from("assessments").select("id", { count: "exact", head: true }).eq("user_id", c.user.id);
+  if (!count) redirect("/assessment");
   return c;
 }
 
