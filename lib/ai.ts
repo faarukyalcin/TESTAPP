@@ -31,7 +31,7 @@ export async function getAIConfig(userId?: string, userDb?: any): Promise<AIConf
     ? decryptSecret(encrypted)
     : provider === "openai" ? process.env.OPENAI_API_KEY : process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error(`${provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY"} missing`);
-  const model = stored?.model || (provider === "openai" ? process.env.OPENAI_MODEL || "gpt-4.1-mini" : process.env.GEMINI_MODEL || "gemini-2.5-flash");
+  const model = stored?.model || (provider === "openai" ? process.env.OPENAI_MODEL || "gpt-4.1-mini" : process.env.GEMINI_MODEL || "gemini-3.8-flash");
   return { provider, apiKey, model };
 }
 
@@ -40,11 +40,11 @@ export async function askAI(system:string,prompt:string,json=false,userId?:strin
   let response:Response;
   if(config.provider==="openai"){
     response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${config.apiKey}`,"Content-Type":"application/json"},signal:AbortSignal.timeout(30000),body:JSON.stringify({max_tokens:2500,model:config.model,messages:[{role:"system",content:system},{role:"user",content:prompt}],...(json?{response_format:{type:"json_object"}}:{})})});
-    if(!response.ok)throw Error(`OpenAI ${response.status}`);
+    if(!response.ok){const d=await response.json().catch(()=>null);throw Error(`OpenAI ${response.status}: ${d?.error?.message||"İstek reddedildi."}`);}
     const d=await response.json(); return d.choices[0].message.content as string;
   }
   response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":config.apiKey},signal:AbortSignal.timeout(30000),body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{temperature:.35,maxOutputTokens:4096,...(json?{responseMimeType:"application/json"}:{})}})});
-  if(!response.ok)throw Error(`Gemini ${response.status}`);
+  if(!response.ok){const d=await response.json().catch(()=>null);throw Error(`Gemini ${response.status}: ${d?.error?.message||"İstek reddedildi."}`);}
   const d=await response.json(); return (d.candidates?.[0]?.content?.parts||[]).map((p:{text?:string})=>p.text||"").join("");
 }
 export function parseAIJson(raw:string){return JSON.parse(raw.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g,"").trim());}
