@@ -52,8 +52,12 @@ export async function POST(req: Request) {
     const readiness = pct(g.score, g.total);
     return NextResponse.json({ assessment: { level, summary: ai.summary, strengths: ai.strengths, weaknesses: ai.weaknesses, plan: ai.plan, scores, readiness, details: g.results.map(r => ({ id: r.id, correct: r.correct, explanation: r.explanation })) } });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "AI servisi yanıt vermedi. API anahtarını ve sağlayıcı ayarını kontrol et." }, { status: 502 });
+    console.error("Assessment AI or persistence failed", e);
+    const timedOut = e instanceof Error && (e.name === "TimeoutError" || /timed? out|timeout/i.test(e.message));
+    return NextResponse.json({
+      error: timedOut
+        ? "AI sağlayıcısı 60 saniye içinde yanıt vermedi. AI bağlantısını test et; hata sürerse API anahtarını sağlayıcı panelinden kontrol et."
+        : "AI servisi yanıt vermedi. API anahtarını ve sağlayıcı ayarını kontrol et."
+    }, { status: 502 });
   }
 }
-
