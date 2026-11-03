@@ -37,10 +37,57 @@ export async function POST(req: Request) {
     schreiben: null, sprechen: null
   };
   try {
-    const raw = await askAI(
-      `You are a cautious German placement tutor for Turkish speakers. The assessed current level is ${level}; do not change it. The student's Goethe goal is ${targetLevel}. Return JSON only: {level:"${level}",summary,writing_score,strengths,weaknesses,plan:{weekly_focus,summary,daily_words,days:[{day,focus,minutes}],review_topics,goethe:{exam_level:"${targetLevel}",weeks:[{week,focus,skills,practice}]}}}. Make exactly 7 daily plan entries. Build a realistic ${examWeeks}-week Goethe ${targetLevel} preparation roadmap, with separate Hören, Lesen, Schreiben and Sprechen practice across the weeks, mock tests and review. writing_score is 0-100 for the German self-introduction (null if empty). Speaking was not tested orally; say so honestly. Explain results in Turkish.`,
-      JSON.stringify({ level, targetLevel, examWeeks, scores, bySkill: g.bySkill, intro, goal, minutes }), true, c.user.id, c.sb);
-    const ai = assessmentAISchema.parse(parseAIJson(raw));
+    let ai: ReturnType<typeof assessmentAISchema.parse>;
+    let aiFallback = false;
+    try {
+      const raw = await askAI(
+        `You are a cautious German placement tutor for Turkish speakers. The assessed current level is ${level}; do not change it. The student's Goethe goal is ${targetLevel}. Return JSON only: {level:"${level}",summary,writing_score,strengths,weaknesses,plan:{weekly_focus,summary,daily_words,days:[{day,focus,minutes}],review_topics,goethe:{exam_level:"${targetLevel}",weeks:[{week,focus,skills,practice}]}}}. Make exactly 7 daily plan entries. Build a realistic ${examWeeks}-week Goethe ${targetLevel} preparation roadmap, with separate Hören, Lesen, Schreiben and Sprechen practice across the weeks, mock tests and review. writing_score is 0-100 for the German self-introduction (null if empty). Speaking was not tested orally; say so honestly. Explain results in Turkish.`,
+        JSON.stringify({ level, targetLevel, examWeeks, scores, bySkill: g.bySkill, intro, goal, minutes }), true, c.user.id, c.sb);
+      ai = assessmentAISchema.parse(parseAIJson(raw));
+    } catch (aiError) {
+      // A provider outage must not trap the learner at the assessment screen.
+      // Preserve the deterministic placement result and provide an actionable starter plan.
+      aiFallback = true;
+      const focus = [
+        ["lesen", "Lesen", scores.lesen],
+        ["horen", "Hören", scores.horen],
+        ["grammatik", "Grammatik", scores.grammatik],
+        ["wortschatz", "Kelime", scores.wortschatz]
+      ].sort((a, b) => Number(a[2] ?? 0) - Number(b[2] ?? 0));
+      const weekCount = Math.max(4, examWeeks);
+      const skills = ["Hören", "Lesen", "Schreiben", "Sprechen"];
+      ai = assessmentAISchema.parse({
+        summary: `Seviye tespit sonucuna göre mevcut seviyen ${level}. AI sağlayıcısı şu anda yanıt vermediği için bu başlangıç planı sınav puanlarına göre hazırlandı; derslerden AI desteğini daha sonra kullanabilirsin.`,
+        writing_score: null,
+        strengths: focus.slice(-2).map((item) => `${item[1]} alanında diğer alanlara göre daha güçlü sonuç.`),
+        weaknesses: focus.slice(0, 2).map((item) => `${item[1]} çalışmasına öncelik ver.`),
+        plan: {
+          weekly_focus: `${focus[0][1]} ve Goethe ${targetLevel} hazırlığı`,
+          summary: `Her gün ${minutes} dakika çalış. Önceliği ${focus[0][1]} ve ${focus[1][1]} alanlarına ver; haftalık Goethe hazırlığını ${targetLevel} hedefine göre sürdür.`,
+          daily_words: 10,
+          days: [
+            { day: "Pazartesi", focus: "Kelime tekrarı ve kısa dinleme", minutes },
+            { day: "Salı", focus: `${focus[0][1]} çalışması ve alıştırmalar`, minutes },
+            { day: "Çarşamba", focus: "Dil bilgisi ve örnek cümleler", minutes },
+            { day: "Perşembe", focus: "Okuma ve metin anlama", minutes },
+            { day: "Cuma", focus: "Kısa yazma ve kendini tanıtma", minutes },
+            { day: "Cumartesi", focus: "Konuşma kalıpları ve sesli tekrar", minutes },
+            { day: "Pazar", focus: "Haftalık tekrar ve mini deneme", minutes }
+          ],
+          review_topics: focus.slice(0, 3).map((item) => item[1]),
+          goethe: {
+            exam_level: targetLevel,
+            weeks: Array.from({ length: weekCount }, (_, index) => ({
+              week: index + 1,
+              focus: index === weekCount - 1 ? "Goethe denemesi ve eksik konuları tekrar" : `${skills[index % skills.length]}: ${focus[index % focus.length][1]} ağırlıklı pratik`,
+              skills,
+              practice: index === weekCount - 1 ? "Süre tutarak deneme çöz; yanlışlarını tekrar et." : `Günde ${minutes} dakika çalış; ${skills[index % skills.length]} için kısa alıştırma ve kelime tekrarı yap.`
+            }))
+          }
+        }
+      });
+      console.error("Assessment continuing with score-based plan after AI failure", aiError);
+    }
     scores.schreiben = intro.trim() ? ai.writing_score : null;
     const input = { goal, minutes, targetLevel, examWeeks, scores, intro, answered: ids.length, total: g.total, score: g.score };
     const a = supabaseAdmin();
@@ -50,7 +97,7 @@ export async function POST(req: Request) {
     await a.from("learning_plans").insert({ user_id: c.user.id, assessment_id: row.id, plan: ai.plan });
     await a.from("profiles").update({ cefr_level: level, learning_goal: goal, daily_minutes: minutes, target_level: targetLevel }).eq("id", c.user.id);
     const readiness = pct(g.score, g.total);
-    return NextResponse.json({ assessment: { level, summary: ai.summary, strengths: ai.strengths, weaknesses: ai.weaknesses, plan: ai.plan, scores, readiness, details: g.results.map(r => ({ id: r.id, correct: r.correct, explanation: r.explanation })) } });
+    return NextResponse.json({ assessment: { level, summary: ai.summary, strengths: ai.strengths, weaknesses: ai.weaknesses, plan: ai.plan, scores, readiness, details: g.results.map(r => ({ id: r.id, correct: r.correct, explanation: r.explanation })), aiFallback } });
   } catch (e) {
     console.error("Assessment AI or persistence failed", e);
     const message = e instanceof Error ? e.message : "";
