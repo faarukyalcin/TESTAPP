@@ -34,6 +34,7 @@ export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-s
       setApiKey(""); setMessage("AI sağlayıcı ayarları kaydedildi.");
       setVerified(false); setSaved(true);
       setStatus({ provider, model, keyConfigured: d.keyConfigured, keySource: "dashboard", updatedAt: new Date().toISOString() });
+      setBusy(false);
       setTesting(true);
       setMessage("Ayar kaydedildi, bağlantı test ediliyor…");
       const test = await fetch(`${endpoint}/test`, { method: "POST" });
@@ -65,7 +66,7 @@ export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-s
     {status && <p className="muted">Durum: {status.keyConfigured ? `API anahtarı hazır (${status.keySource === "dashboard" ? "panelden kaydedildi" : "Vercel ortam değişkeninden geliyor"})` : status.keySource === "dashboard" && status.encryptionReady === false ? "Kayıtlı anahtar var ancak APP_ENCRYPTION_KEY eksik veya geçersiz." : "API anahtarı henüz tanımlanmadı."}</p>}
     {error && <p className="error">{error}</p>}{message && <p className="ok">{message}</p>}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      <button className="btn" disabled={busy || model.trim().length < 2}>{busy ? "Kaydediliyor…" : "Ayarları kaydet"}</button>
+      <button className="btn" disabled={busy || testing || model.trim().length < 2}>{busy ? "Kaydediliyor…" : testing ? "Bağlantı test ediliyor…" : "Ayarları kaydet"}</button>
       <button className="btn ghost" type="button" onClick={testConnection} disabled={testing || !saved || !status?.keyConfigured}>{testing ? "Bağlantı test ediliyor…" : "Gerçek AI bağlantısını test et"}</button>
       {continueTo && saved && status?.keyConfigured && <a className="btn" href={continueTo}>{verified ? "Bağlantı doğrulandı · seviye sınavına geç →" : "Seviye tespitine geç → (AI testini tekrar deneyebilirsin)"}</a>}
     </div>
