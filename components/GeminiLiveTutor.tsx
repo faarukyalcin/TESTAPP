@@ -153,7 +153,9 @@ export default function GeminiLiveTutor({ level }: { level: "A1" | "A2" }) {
       contextRef.current = context;
       await context.resume();
 
-      const tokenResponse = await fetch("/api/live-token", { method: "POST" });
+      const tokenResponse = await fetch("/api/live-token", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario, level })
+      });
       const tokenData = await tokenResponse.json().catch(() => ({}));
       if (!tokenResponse.ok) throw new Error(tokenData.error || "Canlı oturum başlatılamadı.");
 
