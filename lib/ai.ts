@@ -39,11 +39,11 @@ export async function askAI(system:string,prompt:string,json=false,userId?:strin
   const config = await getAIConfig(userId,userDb);
   let response:Response;
   if(config.provider==="openai"){
-    response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${config.apiKey}`,"Content-Type":"application/json"},signal:AbortSignal.timeout(30000),body:JSON.stringify({max_tokens:2500,model:config.model,messages:[{role:"system",content:system},{role:"user",content:prompt}],...(json?{response_format:{type:"json_object"}}:{})})});
+    response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${config.apiKey}`,"Content-Type":"application/json"},signal:AbortSignal.timeout(60000),body:JSON.stringify({max_tokens:2500,model:config.model,messages:[{role:"system",content:system},{role:"user",content:prompt}],...(json?{response_format:{type:"json_object"}}:{})})});
     if(!response.ok){const d=await response.json().catch(()=>null);throw Error(`OpenAI ${response.status}: ${d?.error?.message||"İstek reddedildi."}`);}
     const d=await response.json(); return d.choices[0].message.content as string;
   }
-  response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":config.apiKey},signal:AbortSignal.timeout(30000),body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{temperature:.35,maxOutputTokens:4096,...(json?{responseMimeType:"application/json"}:{})}})});
+  response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":config.apiKey},signal:AbortSignal.timeout(60000),body:JSON.stringify({systemInstruction:{parts:[{text:system}]},contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{temperature:.35,maxOutputTokens:4096,...(json?{responseMimeType:"application/json"}:{})}})});
   if(!response.ok){const d=await response.json().catch(()=>null);throw Error(`Gemini ${response.status}: ${d?.error?.message||"İstek reddedildi."}`);}
   const d=await response.json(); return (d.candidates?.[0]?.content?.parts||[]).map((p:{text?:string})=>p.text||"").join("");
 }
