@@ -29,7 +29,7 @@ export async function requireUser() {
 export async function requireStudent() {
   const c = await requireUser();
   // No learning screen or assessment is available until a real AI provider is connected.
-  try { await getAIConfig(); }
+  try { await getAIConfig(c.user.id, c.sb); }
   catch { redirect("/setup/ai"); }
   const { count } = await c.sb.from("assessments").select("id", { count: "exact", head: true }).eq("user_id", c.user.id);
   if (!count) redirect("/assessment");
@@ -53,3 +53,4 @@ export async function requireAdmin() {
   if (c.profile.role !== "admin") redirect("/");
   return c;
 }
+
