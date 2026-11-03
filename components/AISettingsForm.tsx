@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 type Settings = { provider: "gemini" | "openai"; model: string; keyConfigured: boolean; keySource: "dashboard" | "vercel" | "missing"; encryptionReady?: boolean; updatedAt: string | null };
 const MODELS = { gemini: "gemini-2.5-flash", openai: "gpt-4.1-mini" };
 
+async function responseJson(r: Response) {
+  return r.json().catch(() => ({ error: `Sunucu geçerli JSON döndürmedi (HTTP ${r.status}). Vercel API ayarlarını kontrol et.` }));
+}
+
 export default function AISettingsForm({ continueTo }: { continueTo?: string }) {
   const [provider, setProvider] = useState<"gemini" | "openai">("gemini");
   const [model, setModel] = useState(MODELS.gemini);
@@ -18,7 +22,7 @@ export default function AISettingsForm({ continueTo }: { continueTo?: string }) 
 
   useEffect(() => {
     fetch("/api/admin/ai-settings").then(async r => {
-      const d = await r.json(); if (!r.ok) throw new Error(d.error || "Ayarlar alınamadı.");
+      const d = await responseJson(r); if (!r.ok) throw new Error(d.error || "Ayarlar alınamadı.");
       setStatus(d); setProvider(d.provider); setModel(d.model); setSaved(true);
     }).catch(e => setError(e instanceof Error ? e.message : "Ayarlar alınamadı."));
   }, []);
@@ -27,7 +31,7 @@ export default function AISettingsForm({ continueTo }: { continueTo?: string }) 
     e.preventDefault(); setBusy(true); setError(""); setMessage("");
     try {
       const r = await fetch("/api/admin/ai-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, model, apiKey }) });
-      const d = await r.json(); if (!r.ok) throw new Error(d.error || "Kaydedilemedi.");
+      const d = await responseJson(r); if (!r.ok) throw new Error(d.error || "Kaydedilemedi.");
       setApiKey(""); setMessage("AI sağlayıcı ayarları kaydedildi.");
       setVerified(false); setSaved(true);
       setStatus({ provider, model, keyConfigured: d.keyConfigured, keySource: "dashboard", updatedAt: new Date().toISOString() });
@@ -39,7 +43,7 @@ export default function AISettingsForm({ continueTo }: { continueTo?: string }) 
     setTesting(true); setError(""); setMessage("");
     try {
       const r = await fetch("/api/admin/ai-settings/test", { method: "POST" });
-      const d = await r.json();
+      const d = await responseJson(r);
       if (!r.ok) throw new Error(d.error || "AI bağlantısı test edilemedi.");
       setVerified(true);
       setMessage(`Bağlantı başarılı · ${d.latencyMs} ms · ${d.reply}`);
