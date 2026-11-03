@@ -3,12 +3,11 @@ import { useEffect, useState } from "react";
 
 type Settings = { provider: "gemini" | "openai"; model: string; keyConfigured: boolean; keySource: "dashboard" | "vercel" | "missing"; encryptionReady?: boolean; updatedAt: string | null };
 const MODELS = { gemini: "gemini-2.5-flash", openai: "gpt-4.1-mini" };
-
 async function responseJson(r: Response) {
   return r.json().catch(() => ({ error: `Sunucu geçerli JSON döndürmedi (HTTP ${r.status}). Vercel API ayarlarını kontrol et.` }));
 }
 
-export default function AISettingsForm({ continueTo }: { continueTo?: string }) {
+export default function AISettingsForm({ continueTo, endpoint = "/api/admin/ai-settings" }: { continueTo?: string; endpoint?: string }) {
   const [provider, setProvider] = useState<"gemini" | "openai">("gemini");
   const [model, setModel] = useState(MODELS.gemini);
   const [apiKey, setApiKey] = useState("");
@@ -21,16 +20,16 @@ export default function AISettingsForm({ continueTo }: { continueTo?: string }) 
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch("/api/admin/ai-settings").then(async r => {
+    fetch(endpoint).then(async r => {
       const d = await responseJson(r); if (!r.ok) throw new Error(d.error || "Ayarlar alınamadı.");
       setStatus(d); setProvider(d.provider); setModel(d.model); setSaved(true);
     }).catch(e => setError(e instanceof Error ? e.message : "Ayarlar alınamadı."));
-  }, []);
+  }, [endpoint]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError(""); setMessage("");
     try {
-      const r = await fetch("/api/admin/ai-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, model, apiKey }) });
+      const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, model, apiKey }) });
       const d = await responseJson(r); if (!r.ok) throw new Error(d.error || "Kaydedilemedi.");
       setApiKey(""); setMessage("AI sağlayıcı ayarları kaydedildi.");
       setVerified(false); setSaved(true);
@@ -42,7 +41,7 @@ export default function AISettingsForm({ continueTo }: { continueTo?: string }) 
   async function testConnection() {
     setTesting(true); setError(""); setMessage("");
     try {
-      const r = await fetch("/api/admin/ai-settings/test", { method: "POST" });
+      const r = await fetch(`${endpoint}/test`, { method: "POST" });
       const d = await responseJson(r);
       if (!r.ok) throw new Error(d.error || "AI bağlantısı test edilemedi.");
       setVerified(true);
@@ -65,3 +64,4 @@ export default function AISettingsForm({ continueTo }: { continueTo?: string }) 
     </div>
   </form>;
 }
+
