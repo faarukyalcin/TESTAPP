@@ -28,8 +28,20 @@ export async function POST(req: Request) {
       { user_id: c.user.id, role: "assistant", content: reply }
     ]);
     return NextResponse.json({ reply });
-  } catch {
-    return NextResponse.json({ error: "AI öğretmen yanıt veremedi. Bağlantı ve kota ayarlarını kontrol et." }, { status: 502 });
+  } catch (error) {
+    console.error("AI teacher request failed", error);
+    const message = error instanceof Error ? error.message : "";
+    const providerBusy = /Gemini (429|503)|OpenAI (429|503)/i.test(message);
+    const timedOut = error instanceof Error && (error.name === "TimeoutError" || /timeout/i.test(message));
+    const badKey = /OpenAI (401|403)|Gemini (400|401|403)/i.test(message);
+    const userMessage = providerBusy
+      ? "AI sağlayıcısı şu anda yoğun veya kotası dolu. Biraz sonra yeniden dene."
+      : timedOut
+        ? "AI öğretmen yanıtı zaman aşımına uğradı. Tekrar deneyebilirsin."
+        : badKey
+          ? "AI anahtarı veya seçilen model geçersiz. AI ayarlarından sağlayıcı bilgilerini kontrol et."
+          : "AI öğretmen yanıt veremedi. AI ayarlarını kontrol edip tekrar dene.";
+    return NextResponse.json({ error: userMessage }, { status: 502 });
   }
 }
 

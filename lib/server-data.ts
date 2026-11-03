@@ -3,7 +3,9 @@ import type { Q } from "@/lib/scoring";
 
 export async function loadPool(): Promise<Q[]> {
   const { data } = await supabaseAdmin().from("exercises").select("*").is("lesson_id", null).is("grammar_id", null);
-  return (data || []) as Q[];
+  return (data || []).map((q: Q) => q.id === "g-praesens-q1"
+    ? { ...q, prompt: "Anna ___ jeden Tag Zeitung. (lesen)" }
+    : q) as Q[];
 }
 export async function loadByIds(ids: string[]): Promise<Q[]> {
   if (!ids.length) return [];
