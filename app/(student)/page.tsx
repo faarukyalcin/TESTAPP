@@ -29,6 +29,7 @@ export default async function Home() {
   const dow = (new Date(Date.now() + 3 * 3600_000).getUTCDay() + 6) % 7;
   const days = (plan.data?.plan?.days || []) as { day: string; focus: string; minutes: number }[];
   const todayPlan = days[dow];
+  const goethe = (plan.data?.plan as any)?.goethe;
   return <main className="wrap">
     <h1>Guten Tag{profile.display_name ? `, ${profile.display_name}` : ""} 👋</h1>
     <p className="muted">Seviye: <b>{profile.cefr_level || "–"}</b> · Hedef: {profile.target_level} · XP: {profile.xp}</p>
@@ -44,7 +45,7 @@ export default async function Home() {
       {todayPlan ? <><h2>{todayPlan.day}: {todayPlan.focus}</h2><p className="muted">{todayPlan.minutes} dakika · {plan.data?.plan?.weekly_focus}</p></> : <p className="muted">Aktif plan yok.</p>}
       <PlanButton />
     </section>
-    {plan.data?.plan?.goethe?.weeks?.length > 0 && <section className="panel"><h2>Goethe {plan.data.plan.goethe.exam_level} hazırlık programı</h2>{plan.data.plan.goethe.weeks.map((w: any) => <details key={w.week}><summary>{w.week}. hafta — {w.focus}</summary><p>{(w.skills || []).join(" · ")}</p><p className="muted">{w.practice}</p></details>)}</section>}
+    {goethe?.weeks?.length > 0 && <section className="panel"><h2>Goethe {goethe.exam_level} hazırlık programı</h2>{goethe.weeks.map((w: any) => <details key={w.week}><summary>{w.week}. hafta — {w.focus}</summary><p>{(w.skills || []).join(" · ")}</p><p className="muted">{w.practice}</p></details>)}</section>}
     <section className="panel"><h2>Beceri durumu</h2><p className="muted">Son seviye tespitine göre (sınav sonuçları İlerleme sayfasında).</p>
       {Object.keys(SKILL_LABEL).map(k => <div key={k} style={{ margin: "10px 0" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span>{SKILL_LABEL[k]}</span><span className="muted">{scores[k] == null ? "Henüz ölçülmedi" : `%${scores[k]}`}</span></div><div className="bar"><i style={{ width: `${scores[k] ?? 0}%` }} /></div></div>)}
     </section>
