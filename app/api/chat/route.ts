@@ -2,12 +2,32 @@ import { NextResponse } from "next/server";
 import { apiContext } from "@/lib/auth";
 import { askAI, chatSchema } from "@/lib/ai";
 import { aiAllowed } from "@/lib/limit";
+import { buildAndActivateLearningPlan, LearningPlanError } from "@/lib/learning-plan";
+import { isPlanRegenerationRequest } from "@/lib/plan-intent";
 
 export async function POST(req: Request) {
   const c = await apiContext();
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const p = chatSchema.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: "Geçersiz mesaj" }, { status: 400 });
+
+  if (isPlanRegenerationRequest(p.data.message)) {
+    try {
+      const plan = await buildAndActivateLearningPlan(c.user.id, c.profile, c.sb);
+      const reply = `Programını ilerlemene göre yeniden hazırladım ve sistemdeki aktif programına ekledim. Bu haftaki odağın: ${plan.weekly_focus}. Ana sayfandaki bugünkü çalışma adımı da yeni programa göre güncellendi.`;
+      const { error } = await c.sb.from("chat_messages").insert([
+        { user_id: c.user.id, role: "user", content: p.data.message },
+        { user_id: c.user.id, role: "assistant", content: reply }
+      ]);
+      if (error) console.error("plan command chat save failed", error);
+      return NextResponse.json({ reply, plan, planUpdated: true });
+    } catch (error) {
+      if (error instanceof LearningPlanError) return NextResponse.json({ error: error.message }, { status: error.status });
+      console.error("Chat plan regeneration failed", error);
+      return NextResponse.json({ error: "Yeni program hazırlanamadı. Mevcut aktif programın korunuyor." }, { status: 502 });
+    }
+  }
+
   if (!(await aiAllowed(c.user.id, "chat", 40))) return NextResponse.json({ error: "Saatlik mesaj sınırına ulaştın. Biraz sonra tekrar dene." }, { status: 429 });
   try {
     const level = c.profile.cefr_level === "A2" ? "A2" : "A1";
