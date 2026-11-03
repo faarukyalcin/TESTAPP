@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 
 type Settings = { provider: "gemini" | "openai"; model: string; keyConfigured: boolean; keySource: "dashboard" | "vercel" | "missing"; encryptionReady?: boolean; updatedAt: string | null };
-const MODELS = { gemini: "gemini-2.5-flash", openai: "gpt-4.1-mini" };
+const MODELS = { gemini: "gemini-3.8-flash", openai: "gpt-4.1-mini" };
 async function responseJson(r: Response) {
   return r.json().catch(() => ({ error: `Sunucu geçerli JSON döndürmedi (HTTP ${r.status}). Vercel API ayarlarını kontrol et.` }));
 }
