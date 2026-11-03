@@ -32,6 +32,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const c = await apiAdminContext();
   if (!c) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "Vercel ortam değişkenlerinde SUPABASE_SERVICE_ROLE_KEY eksik." }, { status: 503 });
   const p = schema.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: "Sağlayıcı, model veya API anahtarı geçersiz." }, { status: 400 });
 
